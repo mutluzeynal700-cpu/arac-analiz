@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Araç Analiz Sistemi</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d47a1">
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+body{
+    font-family: Arial;
+    background:#0d47a1;
+    color:white;
+    text-align:center;
+    padding:30px;
+}
+.box{
+    background:white;
+    color:black;
+    padding:20px;
+    border-radius:10px;
+    max-width:400px;
+    margin:auto;
+}
+input,button{
+    padding:10px;
+    width:100%;
+    margin-top:10px;
+}
+button{
+    background:#0d47a1;
+    color:white;
+    border:none;
+    cursor:pointer;
+}
+.admin{
+    margin-top:40px;
+    background:#ffffff22;
+    padding:20px;
+    border-radius:10px;
+}
+</style>
+</head>
+<body>
+
+<h1>Araç Analiz</h1>
+
+<div class="box">
+    <h3>Kullanıcı Giriş</h3>
+    <input type="email" id="email" placeholder="Email">
+    <input type="password" id="password" placeholder="Şifre">
+    <button onclick="register()">Kayıt Ol</button>
+    <button onclick="login()">Giriş Yap</button>
+</div>
+
+<div class="box" style="margin-top:20px;">
+    <h3>Analiz Satın Al</h3>
+    <p>Fiyat: <b>30 TL</b></p>
+    <button onclick="satinal()">Satın Al</button>
+</div>
+
+<div class="admin">
+    <h3>Admin Panel</h3>
+    <button onclick="listele()">Kullanıcıları Listele</button>
+    <div id="liste"></div>
+</div>
+
+<script>
+
+const supabaseUrl = 'https://lxuqpziqyrrwtzcksgwz.supabase.co'
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4dXFwemlxeXJyd3R6Y2tzZ3d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA1NDM4MzMsImV4cCI6MjA4NjExOTgzM30.WOwK1D4eDNyPxYOe7HUuwndgPFQgmdmCcRxWsfyTSps'
+
+const { createClient } = supabase
+const db = createClient(supabaseUrl, supabaseKey)
+
+async function register(){
+    const email = document.getElementById('email').value
+    const password = document.getElementById('password').value
+
+    const { data, error } = await db.auth.signUp({
+        email: email,
+        password: password
+    })
+
+    if(error){
+        alert("Hata: " + error.message)
+    }else{
+        alert("Kayıt başarılı!")
+    }
+}
+
+async function login(){
+    const email = document.getElementById('email').value
+    const password = document.getElementById('password').value
+
+    const { data, error } = await db.auth.signInWithPassword({
+        email: email,
+        password: password
+    })
+
+    if(error){
+        alert("Hata: " + error.message)
+    }else{
+        alert("Giriş başarılı!")
+    }
+}
+
+async function satinal(){
+    const { data: { user } } = await db.auth.getUser()
+
+    if(!user){
+        alert("Önce giriş yap!")
+        return
+    }
+
+    const { error } = await db.from("odemeler").insert([
+        {
+            user_id: user.id,
+            tutar: 30
+        }
+    ])
+
+    if(error){
+        alert("Hata: " + error.message)
+    }else{
+        alert("30 TL analiz satın alındı (demo kayıt eklendi)")
+    }
+}
+
+async function listele(){
+    const { data, error } = await db.from("odemeler").select("*")
+
+    if(error){
+        alert(error.message)
+        return
+    }
+
+    let html=""
+    data.forEach(k=>{
+        html += "<p>User: "+k.user_id+" | Tutar: "+k.tutar+" TL</p>"
+    })
+
+    document.getElementById("liste").innerHTML = html
+}
+
+// Service Worker
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js");
+}
+
+</script>
+
+</body>
+</html>
