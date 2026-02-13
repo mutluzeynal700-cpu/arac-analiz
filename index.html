@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Araç Analiz - Güvenli Sürüm</title>
+<title>Araç Analiz - Güvenli ve Sözleşmeli</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -13,14 +13,14 @@ body{
     background:#0d47a1;
     color:white;
     text-align:center;
-    padding:30px;
+    padding:20px;
 }
 .box{
     background:white;
     color:black;
     padding:20px;
     border-radius:10px;
-    max-width:400px;
+    max-width:450px;
     margin:auto;
     margin-top:20px;
 }
@@ -35,20 +35,15 @@ button{
     border:none;
     cursor:pointer;
 }
-.hidden{
-    display:none;
-}
-.legal{
-    font-size:12px;
-    color:yellow;
-    margin-top:20px;
-}
+.hidden{ display:none; }
+.legal{ font-size:12px; color:yellow; margin-top:20px; text-align:left; }
 </style>
 </head>
 <body>
 
 <h1>Araç Analiz Sistemi</h1>
 
+<!-- Kayıt / Login -->
 <div class="box" id="authBox">
     <h3>Kullanıcı Giriş</h3>
     <input type="email" id="email" placeholder="Email">
@@ -57,6 +52,22 @@ button{
     <button onclick="login()">Giriş Yap</button>
 </div>
 
+<!-- Sözleşme Onayı -->
+<div class="box hidden" id="tosBox">
+    <h3>Kullanıcı Sözleşmesi ve Gizlilik Politikası</h3>
+    <div style="text-align:left; max-height:200px; overflow-y:auto; border:1px solid #ccc; padding:10px; margin-bottom:10px;">
+        <p>Bu platform yalnızca bilgilendirme amaçlıdır. Araç bilgileri resmi kayıtlardan doğrulanmalıdır.</p>
+        <p>Kullanıcı, sisteme yüklediği veya sorguladığı verilerin doğruluğunu kabul eder ve site yönetimi hukuki sorumluluk kabul etmez.</p>
+        <p>Gizlilik politikamız gereği kişisel veriler yalnızca sistem içi kullanım ve yasal gereklilikler için saklanır.</p>
+        <p>Ücretli hizmetler için ödeme işlemleri Iyzico tarafından güvenli şekilde yürütülür.</p>
+    </div>
+    <label>
+        <input type="checkbox" id="tosCheck"> Okudum ve onaylıyorum
+    </label>
+    <button onclick="acceptTOS()">Onayla ve Devam Et</button>
+</div>
+
+<!-- Kullanıcı Paneli -->
 <div class="box hidden" id="userPanel">
     <h3>Plaka Sorgu</h3>
     <input type="text" id="plaka" placeholder="Plaka gir">
@@ -71,7 +82,7 @@ button{
     <button onclick="logout()">Çıkış Yap</button>
 
     <p class="legal">
-    Not: Bu platform yalnızca bilgilendirme amaçlıdır. Araç bilgileri resmi kayıtlardan doğrulanmalıdır. Site yönetimi hukuki sorumluluk kabul etmez.
+        Not: Bu platform yalnızca bilgilendirme amaçlıdır. Araç bilgileri resmi kayıtlardan doğrulanmalıdır. Site yönetimi hukuki sorumluluk kabul etmez.
     </p>
 </div>
 
@@ -82,96 +93,105 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Vercel site URL
-const REDIRECT_URL = "https://seninsiten.vercel.app";
+// Senin Vercel URL'in
+const REDIRECT_URL = "https://araç-analiz.vercel.app";
 
+// Kayıt
 async function register(){
-    const email = document.getElementById('email').value
-    const password = document.getElementById('password').value
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
 
     const { error } = await db.auth.signUp({
-        email,
-        password,
+        email, password,
         options: { emailRedirectTo: REDIRECT_URL }
     });
 
-    if(error){
-        alert(error.message)
-    }else{
-        alert("Kayıt başarılı! Email doğrulama maili gönderildi.")
-    }
+    if(error) alert(error.message);
+    else alert("Kayıt başarılı! Email doğrulama maili gönderildi.");
 }
 
+// Giriş
 async function login(){
-    const email = document.getElementById('email').value
-    const password = document.getElementById('password').value
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
 
     const { data, error } = await db.auth.signInWithPassword({
-        email,
-        password,
+        email, password,
         options: { emailRedirectTo: REDIRECT_URL }
     });
 
-    if(error){
-        alert(error.message)
-        return
-    }
+    if(error){ alert(error.message); return; }
+    if(!data.user.email_confirmed_at){ alert("Email doğrulanmamış!"); return; }
 
-    if(!data.user.email_confirmed_at){
-        alert("Email doğrulanmamış! Lütfen mail linkine tıklayın.")
-        return
+    // Sözleşme kontrolü
+    const { data: profile } = await db.from('profiles').select('tos_accepted').eq('id', data.user.id).single();
+    if(profile && profile.tos_accepted){
+        document.getElementById("authBox").classList.add("hidden");
+        document.getElementById("userPanel").classList.remove("hidden");
+    } else {
+        document.getElementById("authBox").classList.add("hidden");
+        document.getElementById("tosBox").classList.remove("hidden");
     }
-
-    document.getElementById("authBox").classList.add("hidden")
-    document.getElementById("userPanel").classList.remove("hidden")
 }
 
+// Sözleşme onayı
+async function acceptTOS(){
+    const check = document.getElementById('tosCheck').checked;
+    if(!check){ alert("Devam etmek için sözleşmeyi onaylamalısınız!"); return; }
+
+    const { data: { user }, error } = await db.auth.getUser();
+    if(error || !user) return alert("Giriş yapmalısınız");
+
+    const { error: updateError } = await db.from('profiles').update({
+        tos_accepted: true
+    }).eq('id', user.id);
+
+    if(updateError) return alert("Hata: " + updateError.message);
+
+    document.getElementById("tosBox").classList.add("hidden");
+    document.getElementById("userPanel").classList.remove("hidden");
+}
+
+// Çıkış
 async function logout(){
-    await db.auth.signOut()
-    location.reload()
+    await db.auth.signOut();
+    location.reload();
 }
 
-async function bireyselAl(){
-    const { data: { user } } = await db.auth.getUser()
-    if(!user){ alert("Giriş yap"); return }
+// Plaka sorgu demo
+async function plakaSorgu(){
+    const plaka = document.getElementById("plaka").value.toUpperCase();
+    alert("Plaka sorgulandı (demo): " + plaka);
+}
 
-    const token = prompt("Demo için Iyzico token giriniz") // Test amaçlı
+// Ödeme demo
+async function bireyselAl(){
+    const { data: { user } } = await db.auth.getUser();
+    if(!user){ alert("Giriş yap"); return; }
+
+    const token = prompt("Demo için Iyzico token giriniz")
     const response = await fetch("/api/iyzico_payment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, amount: 30, paymentToken: token })
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ userId: user.id, amount:30, paymentToken: token })
     });
     const result = await response.json();
-    if(result.success){
-        alert("Ödeme başarılı! Tek sorgu hakkı eklendi.")
-    } else {
-        alert("Ödeme başarısız: " + result.message)
-    }
+    if(result.success) alert("Ödeme başarılı! Tek sorgu hakkı eklendi.");
+    else alert("Ödeme başarısız: " + result.message);
 }
 
 async function uyelikAl(){
-    const { data: { user } } = await db.auth.getUser()
-    if(!user){ alert("Giriş yap"); return }
-
-    const bitis = new Date()
-    bitis.setMonth(bitis.getMonth()+1)
+    const { data: { user } } = await db.auth.getUser();
+    if(!user){ alert("Giriş yap"); return; }
 
     const response = await fetch("/api/iyzico_payment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, amount: 100, paymentToken: "TOKEN_FOR_SUBSCRIPTION" })
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ userId: user.id, amount:100, paymentToken:"TOKEN_FOR_SUBSCRIPTION" })
     });
     const result = await response.json();
-    if(result.success){
-        alert("Üyelik aktif edildi.")
-    } else {
-        alert("Ödeme başarısız: " + result.message)
-    }
-}
-
-async function plakaSorgu(){
-    const plaka = document.getElementById("plaka").value.toUpperCase()
-    alert("Plaka sorgulandı (demo): " + plaka)
+    if(result.success) alert("Üyelik aktif edildi.");
+    else alert("Ödeme başarısız: " + result.message);
 }
 </script>
 
