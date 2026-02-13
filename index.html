@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Araç Analiz Sistemi</title>
+<title>Araç Analiz</title>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
@@ -34,56 +35,59 @@ button{
     border:none;
     cursor:pointer;
 }
+.hidden{
+    display:none;
+}
 </style>
 </head>
 <body>
 
-<h1>Araç Analiz</h1>
+<h1>Araç Analiz Sistemi</h1>
 
-<!-- LOGIN -->
-<div class="box" id="loginBox">
-    <h3>Giriş</h3>
+<div class="box" id="authBox">
+    <h3>Kullanıcı Giriş</h3>
     <input type="email" id="email" placeholder="Email">
     <input type="password" id="password" placeholder="Şifre">
     <button onclick="register()">Kayıt Ol</button>
     <button onclick="login()">Giriş Yap</button>
 </div>
 
-<!-- SATIN AL SEÇİM -->
-<div class="box" id="buyBox" style="display:none;">
-    <h3>Paket Seç</h3>
-    <button onclick="tekSorguAl()">Tek Sorgu (30 TL)</button>
-    <button onclick="uyelikAl()">30 Gün Üyelik (99 TL)</button>
-</div>
+<div class="box hidden" id="userPanel">
+    <h3>Plaka Sorgu</h3>
+    <input type="text" id="plaka" placeholder="Plaka gir">
+    <button onclick="plakaSorgu()">Sorgula</button>
 
-<!-- PLAKA -->
-<div class="box" id="plakaBox" style="display:none;">
-    <h3>Plaka Sorgula</h3>
-    <input type="text" id="plaka" placeholder="34ABC123">
-    <button onclick="sorgula()">Sorgula</button>
-    <div id="sonuc"></div>
+    <hr>
+
+    <h3>Analiz Satın Al</h3>
+    <button onclick="bireyselAl()">30 TL Tek Sorgu</button>
+    <button onclick="uyelikAl()">Aylık Üyelik</button>
+
+    <button onclick="logout()">Çıkış Yap</button>
 </div>
 
 <script>
 
-const supabaseUrl = 'https://lxuqpziqyrrwtzcksgwz.supabase.co'
-const supabaseKey = 'BURAYA_KENDI_ANON_KEYINI_YAPISTIR'
-const { createClient } = supabase
-const db = createClient(supabaseUrl, supabaseKey)
+const SUPABASE_URL = "https://lxuqpziqyrrwtzcksgwz.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4dXFwemlxeXJyd3R6Y2tzZ3d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA1NDM4MzMsImV4cCI6MjA4NjExOTgzM30.WOwK1D4eDNyPxYOe7HUuwndgPFQgmdmCcRxWsfyTSps";
 
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// REGISTER
 async function register(){
     const email = document.getElementById('email').value
     const password = document.getElementById('password').value
-    await db.auth.signUp({ email, password })
-    alert("Kayıt başarılı.")
+
+    const { error } = await db.auth.signUp({ email, password })
+
+    if(error){
+        alert(error.message)
+    }else{
+        alert("Kayıt başarılı! Email doğrulama açık olabilir.")
+    }
 }
 
-
-// LOGIN
 async function login(){
-
     const email = document.getElementById('email').value
     const password = document.getElementById('password').value
 
@@ -94,118 +98,60 @@ async function login(){
         return
     }
 
-    document.getElementById("loginBox").style.display="none"
+    if(!data.user.email_confirmed_at){
+        alert("Email doğrulanmamış!")
+        return
+    }
 
-    const user = data.user
+    document.getElementById("authBox").classList.add("hidden")
+    document.getElementById("userPanel").classList.remove("hidden")
+}
 
-    const { data: profile } = await db
-        .from("profiles")
-        .select("*")
-        .eq("user_id", user.id)
-        .single()
+async function logout(){
+    await db.auth.signOut()
+    location.reload()
+}
 
-    if(profile){
+async function bireyselAl(){
+    const { data: { user } } = await db.auth.getUser()
+    if(!user){ alert("Giriş yap"); return }
 
-        const aktifUyelik = profile.membership_status === "active" 
-            && new Date(profile.membership_end) > new Date()
+    const { error } = await db.from("odemeler").insert([
+        { user_id: user.id, tip: "bireysel", tutar: 30 }
+    ])
 
-        if(aktifUyelik || profile.kredi > 0){
-            document.getElementById("plakaBox").style.display="block"
-        }else{
-            document.getElementById("buyBox").style.display="block"
-        }
-
+    if(error){
+        alert(error.message)
     }else{
-        document.getElementById("buyBox").style.display="block"
+        alert("30 TL tek sorgu hakkı eklendi (demo)")
     }
 }
 
-
-// TEK SORGU
-async function tekSorguAl(){
-
-    const { data: { user } } = await db.auth.getUser()
-
-    const { data: profile } = await db
-        .from("profiles")
-        .select("*")
-        .eq("user_id", user.id)
-        .single()
-
-    let mevcutKredi = profile?.kredi || 0
-
-    await db.from("profiles").upsert({
-        user_id: user.id,
-        kredi: mevcutKredi + 1
-    })
-
-    alert("1 kredi eklendi!")
-
-    document.getElementById("buyBox").style.display="none"
-    document.getElementById("plakaBox").style.display="block"
-}
-
-
-// ÜYELİK
 async function uyelikAl(){
-
     const { data: { user } } = await db.auth.getUser()
+    if(!user){ alert("Giriş yap"); return }
 
-    let bitis = new Date()
-    bitis.setDate(bitis.getDate() + 30)
+    const bitis = new Date()
+    bitis.setMonth(bitis.getMonth()+1)
 
-    await db.from("profiles").upsert({
-        user_id: user.id,
-        membership_status: "active",
+    const { error } = await db.from("profiles").update({
+        membership_status: "aktif",
         membership_end: bitis
-    })
+    }).eq("id", user.id)
 
-    alert("30 günlük üyelik aktif!")
-
-    document.getElementById("buyBox").style.display="none"
-    document.getElementById("plakaBox").style.display="block"
+    if(error){
+        alert(error.message)
+    }else{
+        alert("Üyelik aktif edildi (demo)")
+    }
 }
 
-
-// SORGU
-async function sorgula(){
-
-    const { data: { user } } = await db.auth.getUser()
-
-    const { data: profile } = await db
-        .from("profiles")
-        .select("*")
-        .eq("user_id", user.id)
-        .single()
-
-    const aktifUyelik = profile?.membership_status === "active" 
-        && new Date(profile.membership_end) > new Date()
-
-    if(!aktifUyelik){
-
-        if(profile.kredi > 0){
-            await db.from("profiles")
-                .update({ kredi: profile.kredi - 1 })
-                .eq("user_id", user.id)
-        }else{
-            alert("Kredi yok! Paket satın al.")
-            return
-        }
-    }
-
+async function plakaSorgu(){
     const plaka = document.getElementById("plaka").value
-
-    document.getElementById("sonuc").innerHTML = `
-        <p><b>Plaka:</b> ${plaka}</p>
-        <p>Hasar Kaydı: Yok</p>
-        <p>Kilometre: 132.000 km</p>
-        <p>Değişen: 1 parça</p>
-    `
+    alert("Plaka sorgulandı (demo): " + plaka)
 }
 
 </script>
 
 </body>
 </html>
-
-
