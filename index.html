@@ -4,10 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Araç Analiz Sistemi</title>
-
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0d47a1">
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
@@ -25,6 +21,7 @@ body{
     border-radius:10px;
     max-width:400px;
     margin:auto;
+    margin-top:20px;
 }
 input,button{
     padding:10px;
@@ -37,134 +34,176 @@ button{
     border:none;
     cursor:pointer;
 }
-.admin{
-    margin-top:40px;
-    background:#ffffff22;
-    padding:20px;
-    border-radius:10px;
-}
 </style>
 </head>
 <body>
 
 <h1>Araç Analiz</h1>
 
-<div class="box">
-    <h3>Kullanıcı Giriş</h3>
+<!-- LOGIN -->
+<div class="box" id="loginBox">
+    <h3>Giriş</h3>
     <input type="email" id="email" placeholder="Email">
     <input type="password" id="password" placeholder="Şifre">
     <button onclick="register()">Kayıt Ol</button>
     <button onclick="login()">Giriş Yap</button>
 </div>
 
-<div class="box" style="margin-top:20px;">
-    <h3>Analiz Satın Al</h3>
-    <p>Fiyat: <b>30 TL</b></p>
-    <button onclick="satinal()">Satın Al</button>
+<!-- SATIN AL SEÇİM -->
+<div class="box" id="buyBox" style="display:none;">
+    <h3>Paket Seç</h3>
+    <button onclick="tekSorguAl()">Tek Sorgu (30 TL)</button>
+    <button onclick="uyelikAl()">30 Gün Üyelik (99 TL)</button>
 </div>
 
-<div class="admin">
-    <h3>Admin Panel</h3>
-    <button onclick="listele()">Kullanıcıları Listele</button>
-    <div id="liste"></div>
+<!-- PLAKA -->
+<div class="box" id="plakaBox" style="display:none;">
+    <h3>Plaka Sorgula</h3>
+    <input type="text" id="plaka" placeholder="34ABC123">
+    <button onclick="sorgula()">Sorgula</button>
+    <div id="sonuc"></div>
 </div>
 
 <script>
 
 const supabaseUrl = 'https://lxuqpziqyrrwtzcksgwz.supabase.co'
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4dXFwemlxeXJyd3R6Y2tzZ3d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA1NDM4MzMsImV4cCI6MjA4NjExOTgzM30.WOwK1D4eDNyPxYOe7HUuwndgPFQgmdmCcRxWsfyTSps'
-
+const supabaseKey = 'BURAYA_KENDI_ANON_KEYINI_YAPISTIR'
 const { createClient } = supabase
 const db = createClient(supabaseUrl, supabaseKey)
 
+
+// REGISTER
 async function register(){
     const email = document.getElementById('email').value
     const password = document.getElementById('password').value
-
-    const { data, error } = const { data, error } = await supabase.auth.signUp({
-  email: email,
-  password: password
-});
-
-if (data.user) {
-  await supabase.from("profiles").insert([
-    {
-      user_id: data.user.id,
-      email: data.user.email,
-      rolex: "user",
-      membership_status: "inactive"
-    }
-  ]);
+    await db.auth.signUp({ email, password })
+    alert("Kayıt başarılı.")
 }
 
-    if(error){
-        alert("Hata: " + error.message)
-    }else{
-        alert("Kayıt başarılı!")
-    }
-}
 
+// LOGIN
 async function login(){
+
     const email = document.getElementById('email').value
     const password = document.getElementById('password').value
 
-    const { data, error } = await db.auth.signInWithPassword({
-        email: email,
-        password: password
-    })
-
-    if(error){
-        alert("Hata: " + error.message)
-    }else{
-        alert("Giriş başarılı!")
-    }
-}
-
-async function satinal(){
-    const { data: { user } } = await db.auth.getUser()
-
-    if(!user){
-        alert("Önce giriş yap!")
-        return
-    }
-
-    const { error } = await db.from("odemeler").insert([
-        {
-            user_id: user.id,
-            tutar: 30
-        }
-    ])
-
-    if(error){
-        alert("Hata: " + error.message)
-    }else{
-        alert("30 TL analiz satın alındı (demo kayıt eklendi)")
-    }
-}
-
-async function listele(){
-    const { data, error } = await db.from("odemeler").select("*")
+    const { data, error } = await db.auth.signInWithPassword({ email, password })
 
     if(error){
         alert(error.message)
         return
     }
 
-    let html=""
-    data.forEach(k=>{
-        html += "<p>User: "+k.user_id+" | Tutar: "+k.tutar+" TL</p>"
-    })
+    document.getElementById("loginBox").style.display="none"
 
-    document.getElementById("liste").innerHTML = html
+    const user = data.user
+
+    const { data: profile } = await db
+        .from("profiles")
+        .select("*")
+        .eq("user_id", user.id)
+        .single()
+
+    if(profile){
+
+        const aktifUyelik = profile.membership_status === "active" 
+            && new Date(profile.membership_end) > new Date()
+
+        if(aktifUyelik || profile.kredi > 0){
+            document.getElementById("plakaBox").style.display="block"
+        }else{
+            document.getElementById("buyBox").style.display="block"
+        }
+
+    }else{
+        document.getElementById("buyBox").style.display="block"
+    }
 }
 
-// Service Worker
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js");
+
+// TEK SORGU
+async function tekSorguAl(){
+
+    const { data: { user } } = await db.auth.getUser()
+
+    const { data: profile } = await db
+        .from("profiles")
+        .select("*")
+        .eq("user_id", user.id)
+        .single()
+
+    let mevcutKredi = profile?.kredi || 0
+
+    await db.from("profiles").upsert({
+        user_id: user.id,
+        kredi: mevcutKredi + 1
+    })
+
+    alert("1 kredi eklendi!")
+
+    document.getElementById("buyBox").style.display="none"
+    document.getElementById("plakaBox").style.display="block"
+}
+
+
+// ÜYELİK
+async function uyelikAl(){
+
+    const { data: { user } } = await db.auth.getUser()
+
+    let bitis = new Date()
+    bitis.setDate(bitis.getDate() + 30)
+
+    await db.from("profiles").upsert({
+        user_id: user.id,
+        membership_status: "active",
+        membership_end: bitis
+    })
+
+    alert("30 günlük üyelik aktif!")
+
+    document.getElementById("buyBox").style.display="none"
+    document.getElementById("plakaBox").style.display="block"
+}
+
+
+// SORGU
+async function sorgula(){
+
+    const { data: { user } } = await db.auth.getUser()
+
+    const { data: profile } = await db
+        .from("profiles")
+        .select("*")
+        .eq("user_id", user.id)
+        .single()
+
+    const aktifUyelik = profile?.membership_status === "active" 
+        && new Date(profile.membership_end) > new Date()
+
+    if(!aktifUyelik){
+
+        if(profile.kredi > 0){
+            await db.from("profiles")
+                .update({ kredi: profile.kredi - 1 })
+                .eq("user_id", user.id)
+        }else{
+            alert("Kredi yok! Paket satın al.")
+            return
+        }
+    }
+
+    const plaka = document.getElementById("plaka").value
+
+    document.getElementById("sonuc").innerHTML = `
+        <p><b>Plaka:</b> ${plaka}</p>
+        <p>Hasar Kaydı: Yok</p>
+        <p>Kilometre: 132.000 km</p>
+        <p>Değişen: 1 parça</p>
+    `
 }
 
 </script>
 
 </body>
-
 </html>
