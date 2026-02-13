@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Araç Analiz</title>
+<title>Araç Analiz - Güvenli Sürüm</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -38,6 +38,11 @@ button{
 .hidden{
     display:none;
 }
+.legal{
+    font-size:12px;
+    color:yellow;
+    margin-top:20px;
+}
 </style>
 </head>
 <body>
@@ -64,26 +69,36 @@ button{
     <button onclick="uyelikAl()">Aylık Üyelik</button>
 
     <button onclick="logout()">Çıkış Yap</button>
+
+    <p class="legal">
+    Not: Bu platform yalnızca bilgilendirme amaçlıdır. Araç bilgileri resmi kayıtlardan doğrulanmalıdır. Site yönetimi hukuki sorumluluk kabul etmez.
+    </p>
 </div>
 
 <script>
-
 const SUPABASE_URL = "https://lxuqpziqyrrwtzcksgwz.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4dXFwemlxeXJyd3R6Y2tzZ3d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA1NDM4MzMsImV4cCI6MjA4NjExOTgzM30.WOwK1D4eDNyPxYOe7HUuwndgPFQgmdmCcRxWsfyTSps";
 
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// Vercel site URL
+const REDIRECT_URL = "https://seninsiten.vercel.app";
+
 async function register(){
     const email = document.getElementById('email').value
     const password = document.getElementById('password').value
 
-    const { error } = await db.auth.signUp({ email, password })
+    const { error } = await db.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: REDIRECT_URL }
+    });
 
     if(error){
         alert(error.message)
     }else{
-        alert("Kayıt başarılı! Email doğrulama açık olabilir.")
+        alert("Kayıt başarılı! Email doğrulama maili gönderildi.")
     }
 }
 
@@ -91,7 +106,11 @@ async function login(){
     const email = document.getElementById('email').value
     const password = document.getElementById('password').value
 
-    const { data, error } = await db.auth.signInWithPassword({ email, password })
+    const { data, error } = await db.auth.signInWithPassword({
+        email,
+        password,
+        options: { emailRedirectTo: REDIRECT_URL }
+    });
 
     if(error){
         alert(error.message)
@@ -99,7 +118,7 @@ async function login(){
     }
 
     if(!data.user.email_confirmed_at){
-        alert("Email doğrulanmamış!")
+        alert("Email doğrulanmamış! Lütfen mail linkine tıklayın.")
         return
     }
 
@@ -116,14 +135,17 @@ async function bireyselAl(){
     const { data: { user } } = await db.auth.getUser()
     if(!user){ alert("Giriş yap"); return }
 
-    const { error } = await db.from("odemeler").insert([
-        { user_id: user.id, tip: "bireysel", tutar: 30 }
-    ])
-
-    if(error){
-        alert(error.message)
-    }else{
-        alert("30 TL tek sorgu hakkı eklendi (demo)")
+    const token = prompt("Demo için Iyzico token giriniz") // Test amaçlı
+    const response = await fetch("/api/iyzico_payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, amount: 30, paymentToken: token })
+    });
+    const result = await response.json();
+    if(result.success){
+        alert("Ödeme başarılı! Tek sorgu hakkı eklendi.")
+    } else {
+        alert("Ödeme başarısız: " + result.message)
     }
 }
 
@@ -134,23 +156,23 @@ async function uyelikAl(){
     const bitis = new Date()
     bitis.setMonth(bitis.getMonth()+1)
 
-    const { error } = await db.from("profiles").update({
-        membership_status: "aktif",
-        membership_end: bitis
-    }).eq("id", user.id)
-
-    if(error){
-        alert(error.message)
-    }else{
-        alert("Üyelik aktif edildi (demo)")
+    const response = await fetch("/api/iyzico_payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, amount: 100, paymentToken: "TOKEN_FOR_SUBSCRIPTION" })
+    });
+    const result = await response.json();
+    if(result.success){
+        alert("Üyelik aktif edildi.")
+    } else {
+        alert("Ödeme başarısız: " + result.message)
     }
 }
 
 async function plakaSorgu(){
-    const plaka = document.getElementById("plaka").value
+    const plaka = document.getElementById("plaka").value.toUpperCase()
     alert("Plaka sorgulandı (demo): " + plaka)
 }
-
 </script>
 
 </body>
