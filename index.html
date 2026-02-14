@@ -6,13 +6,16 @@
 <title>Araç Analiz Sistemi</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
 body{font-family:Arial;background:#0d47a1;color:white;text-align:center;padding:20px}
-.box{background:white;color:black;padding:20px;border-radius:10px;max-width:450px;margin:auto;margin-top:20px}
+.box{background:white;color:black;padding:20px;border-radius:10px;max-width:500px;margin:auto;margin-top:20px}
 input,button{padding:10px;width:100%;margin-top:10px}
 button{background:#0d47a1;color:white;border:none;cursor:pointer}
 .hidden{display:none}
+.report{background:#f5f5f5;padding:15px;border-radius:8px;margin-top:15px;text-align:left}
+.score{font-size:22px;font-weight:bold}
 </style>
 </head>
 
@@ -31,78 +34,51 @@ button{background:#0d47a1;color:white;border:none;cursor:pointer}
 <div class="box hidden" id="userPanel">
 <h3>Plaka Sorgu</h3>
 <input id="plaka" placeholder="Plaka">
-<button onclick="plakaSorgu()">Sorgula</button>
+<button onclick="plakaSorgu()">Analiz Oluştur</button>
 <button onclick="logout()">Çıkış Yap</button>
+
+<div id="rapor"></div>
 </div>
 
 <div class="box hidden" id="adminPanel">
 <h3>Admin Panel</h3>
-
-<h4>Admin Yap</h4>
-<input id="adminEmail" placeholder="Email">
-<button onclick="makeAdmin()">Admin Yap</button>
-
-<hr>
 
 <h4>Araç Ekle</h4>
 <input id="v_plaka" placeholder="Plaka">
 <input id="v_marka" placeholder="Marka">
 <input id="v_model" placeholder="Model">
 <input id="v_yil" placeholder="Yıl">
-<input id="v_hasar" placeholder="Hasar">
-<input id="v_ekspertiz" placeholder="Ekspertiz">
+<input id="v_km" placeholder="KM">
+<input id="v_ekspertiz" placeholder="Ekspertiz Notu">
 <button onclick="aracEkle()">Kaydet</button>
-
-<hr>
-
-<button onclick="loglariGetir()">İşlem Logları</button>
-<div id="loglar"></div>
 
 </div>
 
 <script>
 
 const SUPABASE_URL="https://lxuqpziqyrrwtzcksgwz.supabase.co";
-const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."; // senin key burada
+const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4dXFwemlxeXJyd3R6Y2tzZ3d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA1NDM4MzMsImV4cCI6MjA4NjExOTgzM30.WOwK1D4eDNyPxYOe7HUuwndgPFQgmdmCcRxWsfyTSps";
 
 const { createClient } = supabase;
 const db=createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 
-// REGISTER
 async function register(){
 const email=emailEl().value;
 const password=passwordEl().value;
-
-const { data, error } = await db.auth.signUp({email,password});
-if(error) return alert(error.message);
-
-// profil varsa geç
-await db.from("profiles").upsert({
-id:data.user.id,
-email:data.user.email,
-is_admin:false
-});
-
-alert("Kayıt başarılı. Mailini onayla.");
+const {error}=await db.auth.signUp({email,password});
+if(error) alert(error.message);
+else alert("Kaydınız başarıyla gerçekleşmiştir. Lütfen emailinizi onaylayın.");
 }
 
-// LOGIN
 async function login(){
 const email=emailEl().value;
 const password=passwordEl().value;
-
 const {data,error}=await db.auth.signInWithPassword({email,password});
 if(error) return alert(error.message);
 if(!data.user.email_confirmed_at) return alert("Email doğrulanmamış");
-
-showUser();
-await checkAdmin();
-}
-
-// USER PANEL
-function showUser(){
 authBox().classList.add("hidden");
 userPanel().classList.remove("hidden");
+checkAdmin();
 }
 
 async function logout(){
@@ -110,83 +86,98 @@ await db.auth.signOut();
 location.reload();
 }
 
-// ADMIN CHECK
 async function checkAdmin(){
 const {data:{user}}=await db.auth.getUser();
-if(!user) return;
-
-const {data,error}=await db.from("profiles").select("is_admin").eq("id",user.id).single();
-if(error) return;
-
+const {data}=await db.from("profiles").select("is_admin").eq("id",user.id).single();
 if(data?.is_admin) adminPanel().classList.remove("hidden");
 }
 
-// ADMIN VER
-async function makeAdmin(){
-const email=adminEmail().value;
-const {error}=await db.from("profiles").update({is_admin:true}).eq("email",email);
-if(error) return alert(error.message);
-alert("Admin yapıldı");
-await logYaz("admin yetki verdi");
-}
-
-// ARAÇ EKLE
 async function aracEkle(){
-const {error}=await db.from("vehicles").insert({
+await db.from("vehicles").insert({
 plaka:v_plaka.value.toUpperCase(),
 marka:v_marka.value,
 model:v_model.value,
 yil:v_yil.value,
-hasar:v_hasar.value,
+km:v_km.value,
 ekspertiz:v_ekspertiz.value
 });
-if(error) return alert(error.message);
-
 alert("Araç kaydedildi");
-await logYaz("araç ekledi");
 }
 
-// PLAKA SORGU
 async function plakaSorgu(){
 const plaka=plakaEl().value.toUpperCase();
+const {data}=await db.from("vehicles").select("*").eq("plaka",plaka).single();
+if(!data) return alert("Araç bulunamadı");
 
-const {data,error}=await db.from("vehicles").select("*").eq("plaka",plaka).single();
-if(error || !data) return alert("Araç bulunamadı");
+const risk=hesaplaRisk(data);
+const kmSuphe=kmAnaliz(data.km,data.yil);
+const guven=guvenPuani(risk,kmSuphe);
 
-alert(
-"Plaka: "+data.plaka+
-"\nMarka: "+data.marka+
-"\nModel: "+data.model+
-"\nYıl: "+data.yil+
-"\nHasar: "+data.hasar+
-"\nEkspertiz: "+data.ekspertiz
-);
+rapor().innerHTML=`
+<div class="report">
+<h3>ARAÇ ANALİZ RAPORU</h3>
 
-await logYaz("plaka sorguladı");
+<b>Plaka:</b> ${data.plaka}<br>
+<b>Marka:</b> ${data.marka}<br>
+<b>Model:</b> ${data.model}<br>
+<b>Yıl:</b> ${data.yil}<br>
+<b>KM:</b> ${data.km}<br>
+
+<hr>
+
+<b>Kilometre Analizi:</b> ${kmSuphe}<br>
+<b>Risk Skoru:</b> ${risk}/100<br>
+<b>Araç Güven Puanı:</b> <span class="score">${guven}</span>
+
+<hr>
+
+<b>Ekspertiz Notu:</b><br>
+${data.ekspertiz}
+
+<br><br>
+<button onclick="pdfOlustur()">PDF İndir</button>
+</div>
+`;
+
+await logYaz("analiz oluşturdu");
 }
 
-// LOG YAZ
+function hesaplaRisk(data){
+let risk=0;
+if(data.yil<2015) risk+=30;
+if(data.km>200000) risk+=40;
+if(data.ekspertiz.includes("ağır")) risk+=30;
+return Math.min(risk,100);
+}
+
+function kmAnaliz(km,yil){
+const ort=15000*(2025-yil);
+if(km>ort*1.5) return "KM yüksek - dikkat";
+if(km<ort*0.5) return "KM düşük - şüpheli olabilir";
+return "Normal kullanım";
+}
+
+function guvenPuani(risk,km){
+let puan=100-risk;
+if(km.includes("şüpheli")) puan-=20;
+return Math.max(puan,0);
+}
+
+function pdfOlustur(){
+const { jsPDF } = window.jspdf;
+const doc=new jsPDF();
+doc.text("ARAÇ ANALİZ RAPORU",20,20);
+doc.text(rapor().innerText,20,40);
+doc.save("arac_analiz.pdf");
+}
+
 async function logYaz(action){
 const {data:{user}}=await db.auth.getUser();
-if(!user) return;
-
 await db.from("logs").insert({
 user_id:user.id,
 email:user.email,
 action:action
 });
-}
-
-// LOG GÖSTER
-async function loglariGetir(){
-const {data}=await db.from("logs").select("*").order("created_at",{ascending:false}).limit(50);
-
-let html="";
-data?.forEach(l=>{
-html+=<p>${l.email} → ${l.action} (${l.created_at})</p>;
-});
-
-loglar().innerHTML=html;
 }
 
 // helpers
@@ -196,8 +187,7 @@ const authBox=()=>document.getElementById("authBox");
 const userPanel=()=>document.getElementById("userPanel");
 const adminPanel=()=>document.getElementById("adminPanel");
 const plakaEl=()=>document.getElementById("plaka");
-const adminEmail=()=>document.getElementById("adminEmail");
-const loglar=()=>document.getElementById("loglar");
+const rapor=()=>document.getElementById("rapor");
 
 </script>
 </body>
