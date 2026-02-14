@@ -8,260 +8,171 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
-body{
-    font-family: Arial;
-    background:#0d47a1;
-    color:white;
-    text-align:center;
-    padding:20px;
-}
-.box{
-    background:white;
-    color:black;
-    padding:20px;
-    border-radius:10px;
-    max-width:450px;
-    margin:auto;
-    margin-top:20px;
-}
-input,button{
-    padding:10px;
-    width:100%;
-    margin-top:10px;
-}
-button{
-    background:#0d47a1;
-    color:white;
-    border:none;
-    cursor:pointer;
-}
-.hidden{ display:none; }
-.admin{ background:#00000022; padding:15px; border-radius:10px; margin-top:15px;}
+body{font-family:Arial;background:#0d47a1;color:white;text-align:center;padding:20px}
+.box{background:white;color:black;padding:20px;border-radius:10px;max-width:450px;margin:auto;margin-top:20px}
+input,button{padding:10px;width:100%;margin-top:10px}
+button{background:#0d47a1;color:white;border:none;cursor:pointer}
+.hidden{display:none}
 </style>
 </head>
 
 <body>
 
-<h1>Araç Analiz</h1>
+<h1>Araç Analiz Sistemi</h1>
 
-<!-- AUTH -->
 <div class="box" id="authBox">
-    <h3>Giriş / Kayıt</h3>
-    <input type="email" id="email" placeholder="Email">
-    <input type="password" id="password" placeholder="Şifre">
-    <button onclick="register()">Kayıt Ol</button>
-    <button onclick="login()">Giriş Yap</button>
+<h3>Giriş</h3>
+<input type="email" id="email" placeholder="Email">
+<input type="password" id="password" placeholder="Şifre">
+<button onclick="register()">Kayıt Ol</button>
+<button onclick="login()">Giriş Yap</button>
 </div>
 
-<!-- USER PANEL -->
 <div class="box hidden" id="userPanel">
-    <h3>Plaka Sorgu</h3>
-    <input type="text" id="plaka" placeholder="Plaka">
-    <button onclick="plakaSorgu()">Sorgula</button>
+<h3>Plaka Sorgu</h3>
+<input id="plaka" placeholder="Plaka">
+<button onclick="plakaSorgu()">Sorgula</button>
+<button onclick="logout()">Çıkış Yap</button>
+</div>
 
-    <hr>
+<div class="box hidden" id="adminPanel">
+<h3>Admin Panel</h3>
 
-    <h3>Satın Alma</h3>
-    <button onclick="tekSorguAl()">30 TL Tek Sorgu</button>
-    <button onclick="uyelikAl()">Aylık Üyelik</button>
+<h4>Admin Yap</h4>
+<input id="adminEmail" placeholder="Email">
+<button onclick="makeAdmin()">Admin Yap</button>
 
-    <p id="durum"></p>
+<hr>
 
-    <button onclick="logout()">Çıkış Yap</button>
+<h4>Araç Ekle</h4>
+<input id="v_plaka" placeholder="Plaka">
+<input id="v_marka" placeholder="Marka">
+<input id="v_model" placeholder="Model">
+<input id="v_yil" placeholder="Yıl">
+<input id="v_hasar" placeholder="Hasar">
+<input id="v_ekspertiz" placeholder="Ekspertiz">
+<button onclick="aracEkle()">Kaydet</button>
 
-    <!-- ADMIN -->
-    <div id="adminPanel" class="admin hidden">
-        <h3>Admin Panel</h3>
-        <input type="email" id="adminEmail" placeholder="Kullanıcı Email">
+<hr>
 
-        <button onclick="makeAdmin()">Admin Yap</button>
-        <button onclick="uyelikVer()">1 Ay Üyelik Ver</button>
-        <button onclick="krediVer()">1 Sorgu Hakkı Ver</button>
-    </div>
+<button onclick="loglariGetir()">İşlem Logları</button>
+<div id="loglar"></div>
+
 </div>
 
 <script>
-const SUPABASE_URL = "https://lxuqpziqyrrwtzcksgwz.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4dXFwemlxeXJyd3R6Y2tzZ3d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA1NDM4MzMsImV4cCI6MjA4NjExOTgzM30.WOwK1D4eDNyPxYOe7HUuwndgPFQgmdmCcRxWsfyTSps";
+
+const SUPABASE_URL="https://lxuqpziqyrrwtzcksgwz.supabase.co";
+const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4dXFwemlxeXJyd3R6Y2tzZ3d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA1NDM4MzMsImV4cCI6MjA4NjExOTgzM30.WOwK1D4eDNyPxYOe7HUuwndgPFQgmdmCcRxWsfyTSps";
 
 const { createClient } = supabase;
-const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const db=createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 
 async function register(){
-    const email = emailEl().value;
-    const password = passEl().value;
-
-    const { error } = await db.auth.signUp({ email, password });
-
-    if(error) alert(error.message);
-    else alert("Kaydınız başarıyla gerçekleşmiştir. Lütfen emailinizi kontrol ediniz.");
+const email=emailEl().value;
+const password=passwordEl().value;
+const {error}=await db.auth.signUp({email,password});
+if(error) alert(error.message);
+else alert("Kayıt başarılı. Mailini onayla.");
 }
 
 async function login(){
-    const email = emailEl().value;
-    const password = passEl().value;
+const email=emailEl().value;
+const password=passwordEl().value;
 
-    const { data, error } = await db.auth.signInWithPassword({ email, password });
+const {data,error}=await db.auth.signInWithPassword({email,password});
+if(error) return alert(error.message);
+if(!data.user.email_confirmed_at) return alert("Email doğrulanmamış");
 
-    if(error){ alert(error.message); return; }
-    if(!data.user.email_confirmed_at){ alert("Email doğrulanmamış!"); return; }
+showUser();
+checkAdmin();
+}
 
-    authBox().classList.add("hidden");
-    userPanel().classList.remove("hidden");
-
-    checkAdmin();
-    durumYaz();
+function showUser(){
+authBox().classList.add("hidden");
+userPanel().classList.remove("hidden");
 }
 
 async function logout(){
-    await db.auth.signOut();
-    location.reload();
-}
-
-async function plakaSorgu(){
-    const { data:{user} } = await db.auth.getUser();
-    if(!user) return;
-
-    const { data:profile } = await db
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-    if(profile.membership_status==="aktif"){
-        alert("Plaka sonucu (üyelik)");
-        return;
-    }
-
-    if(profile.credit > 0){
-        await db.from("profiles")
-            .update({ credit: profile.credit-1 })
-            .eq("id", user.id);
-
-        alert("Plaka sonucu (tek sorgu)");
-        durumYaz();
-        return;
-    }
-
-    alert("Üyelik veya kredi gerekli");
-}
-
-async function tekSorguAl(){
-    const { data:{user} } = await db.auth.getUser();
-    if(!user) return;
-
-    const { data:profile } = await db
-        .from("profiles")
-        .select("credit")
-        .eq("id", user.id)
-        .single();
-
-    await db.from("profiles")
-        .update({ credit: (profile.credit||0)+1 })
-        .eq("id", user.id);
-
-    alert("1 sorgu hakkı eklendi (demo)");
-    durumYaz();
-}
-
-async function uyelikAl(){
-    const { data:{user} } = await db.auth.getUser();
-    if(!user) return;
-
-    const end = new Date();
-    end.setMonth(end.getMonth()+1);
-
-    await db.from("profiles").update({
-        membership_status:"aktif",
-        membership_end:end.toISOString()
-    }).eq("id", user.id);
-
-    alert("Üyelik aktif (demo)");
-    durumYaz();
-}
-
-async function durumYaz(){
-    const { data:{user} } = await db.auth.getUser();
-    const { data:profile } = await db
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-    document.getElementById("durum").innerHTML =
-        "Üyelik: "+profile.membership_status+
-        " | Kredi: "+(profile.credit||0);
+await db.auth.signOut();
+location.reload();
 }
 
 async function checkAdmin(){
-    const { data:{user} } = await db.auth.getUser();
-    const { data } = await db
-        .from("profiles")
-        .select("is_admin")
-        .eq("id", user.id)
-        .single();
-
-    if(data && data.is_admin)
-        document.getElementById("adminPanel").classList.remove("hidden");
-}
-
-async function getUserByEmail(email){
-    const { data } = await db.from("profiles").select("id,email");
-    return data.find(x => x.email===email);
+const {data:{user}}=await db.auth.getUser();
+const {data}=await db.from("profiles").select("is_admin").eq("id",user.id).single();
+if(data?.is_admin) adminPanel().classList.remove("hidden");
 }
 
 async function makeAdmin(){
-    const email = document.getElementById("adminEmail").value;
-    const u = await getUserByEmail(email);
-    if(!u) return alert("Bulunamadı");
-
-    await db.from("profiles")
-        .update({ is_admin:true })
-        .eq("id", u.id);
-
-    alert("Admin yapıldı");
+const email=adminEmail().value;
+const {data}=await db.from("profiles").update({is_admin:true}).eq("email",email);
+alert("Admin yapıldı");
+await logYaz("admin yetki verdi");
 }
 
-async function uyelikVer(){
-    const email = document.getElementById("adminEmail").value;
-    const u = await getUserByEmail(email);
-    if(!u) return alert("Bulunamadı");
-
-    const end = new Date();
-    end.setMonth(end.getMonth()+1);
-
-    await db.from("profiles").update({
-        membership_status:"aktif",
-        membership_end:end.toISOString()
-    }).eq("id", u.id);
-
-    alert("Üyelik verildi");
+async function aracEkle(){
+await db.from("vehicles").insert({
+plaka:v_plaka.value.toUpperCase(),
+marka:v_marka.value,
+model:v_model.value,
+yil:v_yil.value,
+hasar:v_hasar.value,
+ekspertiz:v_ekspertiz.value
+});
+alert("Araç kaydedildi");
+await logYaz("araç ekledi");
 }
 
-async function krediVer(){
-    const email = document.getElementById("adminEmail").value;
-    const u = await getUserByEmail(email);
-    if(!u) return alert("Bulunamadı");
+async function plakaSorgu(){
+const plaka=plakaEl().value.toUpperCase();
 
-    const { data:profile } = await db
-        .from("profiles")
-        .select("credit")
-        .eq("id", u.id)
-        .single();
+const {data}=await db.from("vehicles").select("*").eq("plaka",plaka).single();
 
-    await db.from("profiles")
-        .update({ credit:(profile.credit||0)+1 })
-        .eq("id", u.id);
+if(!data) return alert("Araç bulunamadı");
 
-    alert("Kredi verildi");
+alert(
+"Plaka: "+data.plaka+
+"\nMarka: "+data.marka+
+"\nModel: "+data.model+
+"\nYıl: "+data.yil+
+"\nHasar: "+data.hasar+
+"\nEkspertiz: "+data.ekspertiz
+);
+
+await logYaz("plaka sorguladı");
 }
 
-function emailEl(){ return document.getElementById("email"); }
-function passEl(){ return document.getElementById("password"); }
-function authBox(){ return document.getElementById("authBox"); }
-function userPanel(){ return document.getElementById("userPanel"); }
+async function logYaz(action){
+const {data:{user}}=await db.auth.getUser();
+await db.from("logs").insert({
+user_id:user.id,
+email:user.email,
+action:action
+});
+}
+
+async function loglariGetir(){
+const {data}=await db.from("logs").select("*").order("created_at",{ascending:false}).limit(50);
+
+let html="";
+data.forEach(l=>{
+html+=<p>${l.email} → ${l.action} (${l.created_at})</p>;
+});
+
+loglar().innerHTML=html;
+}
+
+// helpers
+const emailEl=()=>document.getElementById("email");
+const passwordEl=()=>document.getElementById("password");
+const authBox=()=>document.getElementById("authBox");
+const userPanel=()=>document.getElementById("userPanel");
+const adminPanel=()=>document.getElementById("adminPanel");
+const plakaEl=()=>document.getElementById("plaka");
+const adminEmail=()=>document.getElementById("adminEmail");
+const loglar=()=>document.getElementById("loglar");
+
 </script>
-
 </body>
 </html>
-
