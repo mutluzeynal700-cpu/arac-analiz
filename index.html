@@ -17,10 +17,10 @@ button{background:#0d47a1;color:white;border:none;cursor:pointer;}
 </head>
 <body>
 
-<h1>Araç Analiz</h1>
+<h1>Araç Analiz Sistemi</h1>
 
 <div class="box" id="authBox">
-<h3>Giriş</h3>
+<h3>Kullanıcı Giriş</h3>
 <input type="email" id="email" placeholder="Email">
 <input type="password" id="password" placeholder="Şifre">
 <button onclick="register()">Kayıt Ol</button>
@@ -35,7 +35,7 @@ button{background:#0d47a1;color:white;border:none;cursor:pointer;}
 
 <div class="box hidden" id="panel">
 <h3>Plaka Sorgu</h3>
-<input id="plaka" placeholder="Plaka">
+<input id="plaka" placeholder="Plaka gir">
 <button onclick="plakaSorgu()">Sorgula</button>
 
 <hr>
@@ -100,8 +100,20 @@ panel.classList.remove("hidden");
 
 async function tekSorgu(){
 const { data:{user} } = await db.auth.getUser();
+
+const { data:profile } = await db
+.from("profiles")
+.select("tek_sorgu_hak")
+.eq("id",user.id)
+.single();
+
+await db.from("profiles").update({
+tek_sorgu_hak: (profile.tek_sorgu_hak || 0) + 1
+}).eq("id",user.id);
+
 await db.from("odemeler").insert([{user_id:user.id,tip:"tek",tutar:30}]);
-alert("Tek sorgu hakkı verildi (demo)");
+
+alert("1 adet sorgu hakkı tanımlandı");
 }
 
 async function uyelik(){
@@ -118,15 +130,34 @@ alert("Üyelik aktif");
 }
 
 async function plakaSorgu(){
+
+const plaka=document.getElementById("plaka").value.toUpperCase();
+if(!plaka)return alert("Plaka gir");
+
 const { data:{user} } = await db.auth.getUser();
-const { data:profile } = await db.from("profiles").select("*").eq("id",user.id).single();
+
+const { data:profile } = await db
+.from("profiles")
+.select("*")
+.eq("id",user.id)
+.single();
 
 if(profile.membership_status==="aktif"){
-alert("Sınırsız sorgu hakkın var");
+alert("Sorgu yapıldı (üyelik)");
 return;
 }
 
-alert("Tek sorgu kullanıldı (demo)");
+if(profile.tek_sorgu_hak>0){
+
+await db.from("profiles").update({
+tek_sorgu_hak:profile.tek_sorgu_hak-1
+}).eq("id",user.id);
+
+alert("Sorgu yapıldı. Kalan hak: "+(profile.tek_sorgu_hak-1));
+return;
+}
+
+alert("Sorgu hakkınız yok. Lütfen satın alın.");
 }
 
 async function logout(){
