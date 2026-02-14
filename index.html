@@ -9,111 +9,147 @@
 
 <style>
 body{font-family:Arial;background:#0d47a1;color:white;text-align:center;padding:20px;}
-.box{background:white;color:black;padding:20px;border-radius:10px;max-width:450px;margin:auto;margin-top:20px;}
+.box{background:white;color:black;padding:20px;border-radius:10px;max-width:500px;margin:auto;margin-top:20px;}
 input,button{padding:10px;width:100%;margin-top:10px;}
 button{background:#0d47a1;color:white;border:none;cursor:pointer;}
 .hidden{display:none;}
+.admin{background:#222;color:white;}
 </style>
 </head>
 <body>
 
 <h1>Araç Analiz Sistemi</h1>
 
+<!-- AUTH -->
 <div class="box" id="authBox">
-<h3>Kullanıcı Giriş</h3>
+<h3>Giriş</h3>
 <input type="email" id="email" placeholder="Email">
 <input type="password" id="password" placeholder="Şifre">
 <button onclick="register()">Kayıt Ol</button>
 <button onclick="login()">Giriş Yap</button>
 </div>
 
+<!-- TOS -->
 <div class="box hidden" id="tosBox">
 <h3>Kullanıcı Sözleşmesi</h3>
 <label><input type="checkbox" id="tosCheck"> Okudum kabul ediyorum</label>
 <button onclick="acceptTOS()">Devam</button>
 </div>
 
+<!-- USER PANEL -->
 <div class="box hidden" id="panel">
-<h3>Plaka Sorgu</h3>
-<input id="plaka" placeholder="Plaka gir">
-<button onclick="plakaSorgu()">Sorgula</button>
+<h3>Kullanıcı Paneli</h3>
+
+<p><b>Üyelik:</b> <span id="uyelikDurum"></span></p>
+<p><b>Kalan Tek Sorgu:</b> <span id="hakSayisi"></span></p>
+<p><b>Üyelik Bitiş:</b> <span id="bitis"></span></p>
 
 <hr>
 
-<h3>Analiz Satın Al</h3>
+<input id="plaka" placeholder="Plaka gir">
+<button onclick="plakaSorgu()">Plaka Sorgula</button>
+
+<hr>
+
 <button onclick="tekSorgu()">30 TL Tek Sorgu</button>
 <button onclick="uyelik()">Aylık Üyelik</button>
 
 <button onclick="logout()">Çıkış</button>
 </div>
 
+<!-- ADMIN PANEL -->
+<div class="box admin hidden" id="adminPanel">
+<h3>Admin Panel</h3>
+<button onclick="kullanicilariGetir()">Kullanıcıları Listele</button>
+<div id="adminListe"></div>
+</div>
+
 <script>
 const SUPABASE_URL="https://lxuqpziqyrrwtzcksgwz.supabase.co";
-const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4dXFwemlxeXJyd3R6Y2tzZ3d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA1NDM4MzMsImV4cCI6MjA4NjExOTgzM30.WOwK1D4eDNyPxYOe7HUuwndgPFQgmdmCcRxWsfyTSps";
+const SUPABASE_ANON_KEY="BURAYA_ANON_KEY";
 
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ADMIN EMAIL
+const ADMIN_EMAIL="mslmcanlii@gmail.com";
 
 const emailEl=document.getElementById("email");
 const passwordEl=document.getElementById("password");
 const authBox=document.getElementById("authBox");
 const tosBox=document.getElementById("tosBox");
 const panel=document.getElementById("panel");
-const tosCheck=document.getElementById("tosCheck");
+const adminPanel=document.getElementById("adminPanel");
 
 async function register(){
-const email=emailEl.value;
-const password=passwordEl.value;
-
-const { data, error } = await db.auth.signUp({email,password});
+const { data, error } = await db.auth.signUp({
+email:emailEl.value,
+password:passwordEl.value
+});
 if(error)return alert(error.message);
 
-await db.from("profiles").insert([{id:data.user.id,email}]);
+await db.from("profiles").insert([
+{id:data.user.id,email:emailEl.value}
+]);
 
-alert("Kaydınız başarıyla gerçekleşmiştir. Lütfen hesabınızı aktifleştirmek için emailinizi kontrol ediniz.");
+alert("Kaydınız başarıyla gerçekleşmiştir. Lütfen emailinizi doğrulayın.");
 }
 
 async function login(){
-const email=emailEl.value;
-const password=passwordEl.value;
-
-const { data, error } = await db.auth.signInWithPassword({email,password});
+const { data, error } = await db.auth.signInWithPassword({
+email:emailEl.value,
+password:passwordEl.value
+});
 if(error)return alert(error.message);
 
-const { data:profile } = await db.from("profiles").select("*").eq("id",data.user.id).single();
+const { data:profile } = await db
+.from("profiles").select("*")
+.eq("id",data.user.id).single();
 
 authBox.classList.add("hidden");
 
-if(!profile.tos_accepted) tosBox.classList.remove("hidden");
-else panel.classList.remove("hidden");
+if(!profile.tos_accepted){
+tosBox.classList.remove("hidden");
+return;
+}
+
+panel.classList.remove("hidden");
+kullaniciBilgiGoster(profile);
+
+// ADMIN KONTROL
+if(data.user.email===ADMIN_EMAIL){
+adminPanel.classList.remove("hidden");
+}
 }
 
 async function acceptTOS(){
-if(!tosCheck.checked)return alert("Onay gerekli");
-
 const { data:{user} } = await db.auth.getUser();
-await db.from("profiles").update({tos_accepted:true}).eq("id",user.id);
+await db.from("profiles").update({
+tos_accepted:true
+}).eq("id",user.id);
 
 tosBox.classList.add("hidden");
 panel.classList.remove("hidden");
+}
+
+function kullaniciBilgiGoster(profile){
+document.getElementById("uyelikDurum").innerText=profile.membership_status;
+document.getElementById("hakSayisi").innerText=profile.tek_sorgu_hak;
+document.getElementById("bitis").innerText=profile.membership_end || "-";
 }
 
 async function tekSorgu(){
 const { data:{user} } = await db.auth.getUser();
 
 const { data:profile } = await db
-.from("profiles")
-.select("tek_sorgu_hak")
-.eq("id",user.id)
-.single();
+.from("profiles").select("tek_sorgu_hak")
+.eq("id",user.id).single();
 
 await db.from("profiles").update({
-tek_sorgu_hak: (profile.tek_sorgu_hak || 0) + 1
+tek_sorgu_hak:(profile.tek_sorgu_hak||0)+1
 }).eq("id",user.id);
 
-await db.from("odemeler").insert([{user_id:user.id,tip:"tek",tutar:30}]);
-
-alert("1 adet sorgu hakkı tanımlandı");
+alert("1 sorgu hakkı eklendi");
 }
 
 async function uyelik(){
@@ -130,34 +166,51 @@ alert("Üyelik aktif");
 }
 
 async function plakaSorgu(){
-
 const plaka=document.getElementById("plaka").value.toUpperCase();
 if(!plaka)return alert("Plaka gir");
 
 const { data:{user} } = await db.auth.getUser();
-
 const { data:profile } = await db
-.from("profiles")
-.select("*")
-.eq("id",user.id)
-.single();
+.from("profiles").select("*")
+.eq("id",user.id).single();
 
 if(profile.membership_status==="aktif"){
-alert("Sorgu yapıldı (üyelik)");
+plakaApi(plaka);
 return;
 }
 
 if(profile.tek_sorgu_hak>0){
-
 await db.from("profiles").update({
 tek_sorgu_hak:profile.tek_sorgu_hak-1
 }).eq("id",user.id);
 
-alert("Sorgu yapıldı. Kalan hak: "+(profile.tek_sorgu_hak-1));
+plakaApi(plaka);
 return;
 }
 
-alert("Sorgu hakkınız yok. Lütfen satın alın.");
+alert("Sorgu hakkınız yok");
+}
+
+// 🔥 BURAYA GERÇEK PLAKA API BAĞLANACAK
+async function plakaApi(plaka){
+alert("Plaka sorgu sonucu (demo): "+plaka);
+
+// ÖRNEK API BAĞLAMA ŞABLONU
+/*
+const res = await fetch("API_URL?plaka="+plaka);
+const data = await res.json();
+alert(JSON.stringify(data));
+*/
+}
+
+async function kullanicilariGetir(){
+const { data } = await db.from("profiles").select("*");
+
+let html="";
+data.forEach(u=>{
+html+=<p>${u.email} | Üyelik:${u.membership_status} | Hak:${u.tek_sorgu_hak}</p>;
+});
+document.getElementById("adminListe").innerHTML=html;
 }
 
 async function logout(){
