@@ -1,222 +1,181 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html>
 <head>
 <meta charset="UTF-8">
 <title>Araç Analiz Sistemi</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 
 <style>
-body{
-font-family:Arial;
-background:linear-gradient(135deg,#0a3cff,#0ad0ff);
-color:white;
-text-align:center;
+body {
+  font-family: Arial;
+  background: linear-gradient(120deg,#0a58ff,#2bbcff);
+  padding: 40px;
 }
-.box{
-background:white;
-color:black;
-width:420px;
-margin:20px auto;
-padding:20px;
-border-radius:12px;
+.container {
+  max-width: 420px;
+  margin: auto;
 }
-input,button{
-width:100%;
-padding:10px;
-margin:6px 0;
+.card {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  margin-bottom: 20px;
 }
-button{
-background:#0a3cff;
-color:white;
-border:none;
-cursor:pointer;
+input, select, button {
+  width: 100%;
+  padding: 10px;
+  margin-top: 10px;
 }
-.hidden{display:none}
+button {
+  background: #0a58ff;
+  color: white;
+  border: none;
+  font-weight: bold;
+}
 </style>
 </head>
 
 <body>
 
-<h1>Araç Analiz Sistemi</h1>
+<div class="container">
 
-<div class="box" id="authBox">
-<h3>Kayıt / Giriş</h3>
-<input id="email" placeholder="Email">
-<input id="password" type="password" placeholder="Şifre">
-<button onclick="register()">Kayıt Ol</button>
-<button onclick="login()">Giriş Yap</button>
-</div>
-
-<div class="box hidden" id="userPanel">
+<!-- PLAKA SORGULAMA -->
+<div class="card">
 <h3>Plaka Sorgu</h3>
-<input id="plate" placeholder="Plaka">
-
-<button onclick="buySingle()">Tek Sorgu Satın Al (30 TL)</button>
-<button onclick="buyMembership()">Aylık Üyelik Al</button>
-<button onclick="analyze()">Analiz Oluştur</button>
-<button onclick="logout()">Çıkış Yap</button>
-
-<div id="result"></div>
+<input id="plakaSorgu" placeholder="Plaka">
+<button onclick="analiz()">Analiz Oluştur</button>
+<button onclick="tekSorgu()">Tek Sorgu Satın Al (30 TL)</button>
+<button onclick="uyelik()">Aylık Üyelik Al</button>
+<button onclick="cikis()">Çıkış Yap</button>
 </div>
 
-<div class="box hidden" id="adminPanel">
-<h3>Admin Panel</h3>
-<h4>Araç Ekle</h4>
-<input id="a_plate" placeholder="Plaka">
-<input id="a_brand" placeholder="Marka">
-<input id="a_model" placeholder="Model">
-<input id="a_year" placeholder="Yıl">
-<input id="a_km" placeholder="KM">
-<input id="a_exp" placeholder="Ekspertiz">
-<button onclick="addVehicle()">Kaydet</button>
+<!-- ADMIN PANEL -->
+<div class="card">
+<h3>Admin Panel — Araç Ekle</h3>
 
-<h4>Kullanıcılar</h4>
-<div id="users"></div>
+<form id="vehicleForm">
+
+<input type="text" id="plaka" placeholder="Plaka" required>
+
+<select id="marka" required></select>
+<select id="model" required></select>
+<select id="yil" required></select>
+
+<input type="number" id="km" placeholder="Kilometre">
+
+<label>Ekspertiz Raporu</label>
+<input type="file" id="expertiz" accept="image/*">
+
+<button type="submit">Kaydet</button>
+
+</form>
+</div>
+
 </div>
 
 <script>
+// SUPABASE AYARLARIN
+const supabaseUrl = "https://lxuqpziqyrrwtzcksgwz.supabase.co";
+const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4dXFwemlxeXJyd3R6Y2tzZ3d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA1NDM4MzMsImV4cCI6MjA4NjExOTgzM30.WOwK1D4eDNyPxYOe7HUuwndgPFQgmdmCcRxWsfyTSps";
+const sb = supabase.createClient(supabaseUrl, supabaseKey);
 
-const SUPABASE_URL="https://lxuqpziqyrrwtzcksgwz.supabase.co";
-const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4dXFwemlxeXJyd3R6Y2tzZ3d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA1NDM4MzMsImV4cCI6MjA4NjExOTgzM30.WOwK1D4eDNyPxYOe7HUuwndgPFQgmdmCcRxWsfyTSps";
-const db=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 
-let currentUser=null;
+// MARKA MODEL DATA
+const cars = {
+  BMW: ["1 Serisi","3 Serisi","5 Serisi","X1","X3","X5"],
+  Mercedes: ["A","C","E","CLA","GLA","GLC"],
+  Audi: ["A3","A4","A6","Q2","Q3","Q5"],
+  Volkswagen: ["Polo","Golf","Passat","Tiguan"],
+  Hyundai: ["i10","i20","i30","Elantra","Tucson"],
+  Renault: ["Clio","Megane","Taliant","Captur"],
+  Fiat: ["Egea","Panda","500"],
+  Toyota: ["Corolla","Yaris","C-HR"],
+  Honda: ["Civic","City","HR-V"]
+};
 
-async function register(){
-let email=document.getElementById("email").value;
-let password=document.getElementById("password").value;
-await db.auth.signUp({email,password});
-alert("Mail onayla");
-}
 
-async function login(){
-let email=document.getElementById("email").value;
-let password=document.getElementById("password").value;
-let {data}=await db.auth.signInWithPassword({email,password});
-currentUser=data.user;
-initUser();
-}
-
-async function logout(){
-await db.auth.signOut();
-location.reload();
-}
-
-async function initUser(){
-document.getElementById("authBox").classList.add("hidden");
-document.getElementById("userPanel").classList.remove("hidden");
-
-let {data:profile}=await db.from("profiles").select("*").eq("id",currentUser.id).single();
-
-if(profile.is_admin){
-document.getElementById("adminPanel").classList.remove("hidden");
-loadUsers();
-}
-
-if(profile.membership_until && new Date(profile.membership_until)<new Date()){
-alert("Üyelik süren dolmuş");
-}
-}
-
-async function buyMembership(){
-await db.from("profiles").update({
-membership_until:new Date(Date.now()+30*86400000)
-}).eq("id",currentUser.id);
-
-alert("Üyelik aktif");
-}
-
-async function buySingle(){
-await db.from("profiles").update({single_query:true}).eq("id",currentUser.id);
-alert("Tek sorgu aktif");
-}
-
-function calculateScore(year,km){
-let score=100;
-let age=new Date().getFullYear()-year;
-score-=age*2;
-if(km>200000)score-=20;
-if(km>300000)score-=30;
-return Math.max(score,10);
-}
-
-function kmRisk(km,year){
-let avg=(new Date().getFullYear()-year)*15000;
-return km>avg*1.7 ? "KM ŞÜPHELİ" : "Normal";
-}
-
-async function analyze(){
-let plate=document.getElementById("plate").value;
-let {data:vehicle}=await db.from("vehicles").select("*").eq("plate",plate).single();
-
-if(!vehicle){
-alert("Araç bulunamadı");
-return;
-}
-
-let score=calculateScore(vehicle.year,vehicle.km);
-let risk=kmRisk(vehicle.km,vehicle.year);
-
-document.getElementById("result").innerHTML=
-`
-<h3>${vehicle.brand} ${vehicle.model}</h3>
-Güven Puanı: ${score}<br>
-KM Durum: ${risk}<br>
-Ekspertiz: ${vehicle.expertiz}<br>
-<button onclick="downloadPDF('${vehicle.brand}','${vehicle.model}','${score}','${risk}')">PDF İndir</button>
-`;
-
-await db.from("logs").insert({
-user_id:currentUser.id,
-email:currentUser.email,
-action:"analiz:"+plate
-});
-}
-
-function downloadPDF(brand,model,score,risk){
-const {jsPDF}=window.jspdf;
-let doc=new jsPDF();
-doc.text("Araç Analiz Raporu",20,20);
-doc.text("Araç: "+brand+" "+model,20,40);
-doc.text("Güven Puanı: "+score,20,60);
-doc.text("Risk: "+risk,20,80);
-doc.save("rapor.pdf");
-}
-
-async function addVehicle(){
-let plate=document.getElementById("a_plate").value;
-let brand=document.getElementById("a_brand").value;
-let model=document.getElementById("a_model").value;
-let year=document.getElementById("a_year").value;
-let km=document.getElementById("a_km").value;
-let expertiz=document.getElementById("a_exp").value;
-
-await db.from("vehicles").insert({
-plate,brand,model,year,km,expertiz
+// MARKA DOLDUR
+const markaSelect = document.getElementById("marka");
+markaSelect.innerHTML = <option value="">Marka Seç</option>;
+Object.keys(cars).forEach(marka => {
+  markaSelect.innerHTML += <option>${marka}</option>;
 });
 
-alert("Araç eklendi");
-}
 
-async function loadUsers(){
-let {data}=await db.from("profiles").select("id,email,is_admin");
-let html="";
-data.forEach(u=>{
-html+=`
-<div>
-${u.email} 
-<button onclick="makeAdmin('${u.id}')">Admin Yap</button>
-</div>
-`;
+// MODEL DOLDUR
+markaSelect.addEventListener("change", () => {
+  const modelSelect = document.getElementById("model");
+  modelSelect.innerHTML = <option value="">Model Seç</option>;
+  cars[markaSelect.value].forEach(model => {
+    modelSelect.innerHTML += <option>${model}</option>;
+  });
 });
-document.getElementById("users").innerHTML=html;
+
+
+// YIL LİSTESİ
+const yilSelect = document.getElementById("yil");
+yilSelect.innerHTML = <option value="">Yıl Seç</option>;
+for (let i = 2025; i >= 1995; i--) {
+  yilSelect.innerHTML += <option>${i}</option>;
 }
 
-async function makeAdmin(id){
-await db.from("profiles").update({is_admin:true}).eq("id",id);
-alert("Admin verildi");
+
+// ARAÇ EKLE
+document.getElementById("vehicleForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const file = document.getElementById("expertiz").files[0];
+  let imageUrl = null;
+
+  if (file) {
+    const fileName = Date.now() + "_" + file.name;
+    const { error } = await sb.storage.from("expertiz").upload(fileName, file);
+    if (!error) {
+      imageUrl = sb.storage.from("expertiz").getPublicUrl(fileName).data.publicUrl;
+    }
+  }
+
+  const { error } = await sb.from("vehicles").insert({
+    plaka: document.getElementById("plaka").value,
+    marka: document.getElementById("marka").value,
+    model: document.getElementById("model").value,
+    yil: document.getElementById("yil").value,
+    km: document.getElementById("km").value,
+    expertiz_url: imageUrl
+  });
+
+  if (!error) {
+    alert("Araç eklendi");
+    location.reload();
+  } else {
+    alert("Hata oluştu");
+  }
+});
+
+
+// ANALİZ
+async function analiz(){
+  const plaka = document.getElementById("plakaSorgu").value;
+
+  const { data } = await sb
+    .from("vehicles")
+    .select("*")
+    .eq("plaka", plaka)
+    .single();
+
+  if(data){
+    alert("Araç bulundu: " + data.marka + " " + data.model);
+  }else{
+    alert("Araç bulunamadı");
+  }
 }
+
+
+// SADE BUTONLAR
+function tekSorgu(){ alert("iyzico bağlanınca aktif"); }
+function uyelik(){ alert("iyzico bağlanınca aktif"); }
+function cikis(){ location.reload(); }
 
 </script>
 </body>
