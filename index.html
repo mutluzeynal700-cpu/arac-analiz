@@ -87,7 +87,7 @@ async function register(){
 let email=document.getElementById("email").value;
 let password=document.getElementById("password").value;
 await db.auth.signUp({email,password});
-alert("Mail onayla");
+alert("kaydınız başarıyla gerçekleşmiştir.Lütfen size gönderilen emaili onaylayınız");
 }
 
 async function login(){
@@ -221,3 +221,4 @@ alert("Admin verildi");
 </script>
 </body>
 </html>
+
