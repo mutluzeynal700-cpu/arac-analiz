@@ -16,12 +16,12 @@ text-align:center;
 .box{
 background:white;
 color:black;
-width:420px;
+width:450px;
 margin:20px auto;
 padding:20px;
 border-radius:12px;
 }
-input,button{
+input,button,select{
 width:100%;
 padding:10px;
 margin:6px 0;
@@ -40,6 +40,7 @@ cursor:pointer;
 
 <h1>Araç Analiz Sistemi</h1>
 
+<!-- Kayıt / Giriş -->
 <div class="box" id="authBox">
 <h3>Kayıt / Giriş</h3>
 <input id="email" placeholder="Email">
@@ -48,27 +49,28 @@ cursor:pointer;
 <button onclick="login()">Giriş Yap</button>
 </div>
 
+<!-- Kullanıcı Paneli -->
 <div class="box hidden" id="userPanel">
 <h3>Plaka Sorgu</h3>
 <input id="plate" placeholder="Plaka">
-
 <button onclick="buySingle()">Tek Sorgu Satın Al (30 TL)</button>
 <button onclick="buyMembership()">Aylık Üyelik Al</button>
 <button onclick="analyze()">Analiz Oluştur</button>
 <button onclick="logout()">Çıkış Yap</button>
-
 <div id="result"></div>
 </div>
 
+<!-- Admin Paneli -->
 <div class="box hidden" id="adminPanel">
 <h3>Admin Panel</h3>
+
 <h4>Araç Ekle</h4>
 <input id="a_plate" placeholder="Plaka">
-<input id="a_brand" placeholder="Marka">
-<input id="a_model" placeholder="Model">
-<input id="a_year" placeholder="Yıl">
+<select id="a_brand"></select>
+<select id="a_model"></select>
+<select id="a_year"></select>
 <input id="a_km" placeholder="KM">
-<input id="a_exp" placeholder="Ekspertiz">
+<input type="file" id="a_exp_file" accept=".jpg,.jpeg,.png,.pdf">
 <button onclick="addVehicle()">Kaydet</button>
 
 <h4>Kullanıcılar</h4>
@@ -77,145 +79,191 @@ cursor:pointer;
 
 <script>
 
-const SUPABASE_URL="https://arac-analiz.vercel.app";
+// Supabase
+const SUPABASE_URL="https://lxuqpziqyrrwtzcksgwz.supabase.co";
 const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4dXFwemlxeXJyd3R6Y2tzZ3d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA1NDM4MzMsImV4cCI6MjA4NjExOTgzM30.WOwK1D4eDNyPxYOe7HUuwndgPFQgmdmCcRxWsfyTSps";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 
 let currentUser=null;
 
+// Sightengine API
+const SIGHTENGINE_USER="BURAYA_API_USER";
+const SIGHTENGINE_SECRET="BURAYA_API_SECRET";
+
+// Araç seçenekleri
+const brands = {
+  "Toyota": ["Corolla","Yaris","Camry"],
+  "Honda": ["Civic","Accord","Jazz"],
+  "Ford": ["Focus","Fiesta","Mondeo"]
+};
+const years = Array.from({length:26},(_,i)=>2025-i);
+
+// Marka dropdown doldur
+const brandEl=document.getElementById("a_brand");
+const modelEl=document.getElementById("a_model");
+const yearEl=document.getElementById("a_year");
+
+for(let b in brands){
+  let opt=document.createElement("option");
+  opt.value=b; opt.text=b;
+  brandEl.appendChild(opt);
+}
+brandEl.onchange=()=>{
+  modelEl.innerHTML="";
+  brands[brandEl.value].forEach(m=>{
+    let opt=document.createElement("option");
+    opt.value=m; opt.text=m;
+    modelEl.appendChild(opt);
+  });
+}
+brandEl.onchange();
+
+years.forEach(y=>{
+  let opt=document.createElement("option");
+  opt.value=y; opt.text=y;
+  yearEl.appendChild(opt);
+});
+
+// Kayıt / Giriş
 async function register(){
-let email=document.getElementById("email").value;
-let password=document.getElementById("password").value;
-await db.auth.signUp({email,password});
-alert("Mail onayla");
+  let email=document.getElementById("email").value;
+  let password=document.getElementById("password").value;
+  await db.auth.signUp({email,password});
+  alert("Mailinizi onaylayın");
 }
-
 async function login(){
-let email=document.getElementById("email").value;
-let password=document.getElementById("password").value;
-let {data}=await db.auth.signInWithPassword({email,password});
-currentUser=data.user;
-initUser();
+  let email=document.getElementById("email").value;
+  let password=document.getElementById("password").value;
+  let {data}=await db.auth.signInWithPassword({email,password});
+  currentUser=data.user;
+  initUser();
 }
+async function logout(){await db.auth.signOut(); location.reload();}
 
-async function logout(){
-await db.auth.signOut();
-location.reload();
-}
-
+// Kullanıcı paneli başlat
 async function initUser(){
-document.getElementById("authBox").classList.add("hidden");
-document.getElementById("userPanel").classList.remove("hidden");
+  document.getElementById("authBox").classList.add("hidden");
+  document.getElementById("userPanel").classList.remove("hidden");
 
-let {data:profile}=await db.from("profiles").select("*").eq("id",currentUser.id).single();
+  let {data:profile}=await db.from("profiles").select("*").eq("id",currentUser.id).single();
 
-if(profile.is_admin){
-document.getElementById("adminPanel").classList.remove("hidden");
-loadUsers();
+  if(profile.is_admin){
+    document.getElementById("adminPanel").classList.remove("hidden");
+    loadUsers();
+  }
+
+  if(profile.membership_until && new Date(profile.membership_until)<new Date()){
+    alert("Üyelik süren dolmuş");
+  }
 }
 
-if(profile.membership_until && new Date(profile.membership_until)<new Date()){
-alert("Üyelik süren dolmuş");
-}
-}
-
+// Üyelik ve tek sorgu
 async function buyMembership(){
-await db.from("profiles").update({
-membership_until:new Date(Date.now()+30*86400000)
-}).eq("id",currentUser.id);
-
-alert("Üyelik aktif");
+  await db.from("profiles").update({
+    membership_until:new Date(Date.now()+30*86400000)
+  }).eq("id",currentUser.id);
+  alert("Üyelik aktif");
 }
-
 async function buySingle(){
-await db.from("profiles").update({single_query:true}).eq("id",currentUser.id);
-alert("Tek sorgu aktif");
+  await db.from("profiles").update({single_query:true}).eq("id",currentUser.id);
+  alert("Tek sorgu aktif");
 }
 
+// Araç Analiz
 function calculateScore(year,km){
-let score=100;
-let age=new Date().getFullYear()-year;
-score-=age*2;
-if(km>200000)score-=20;
-if(km>300000)score-=30;
-return Math.max(score,10);
+  let score=100;
+  let age=new Date().getFullYear()-year;
+  score-=age*2;
+  if(km>200000)score-=20;
+  if(km>300000)score-=30;
+  return Math.max(score,10);
 }
-
 function kmRisk(km,year){
-let avg=(new Date().getFullYear()-year)*15000;
-return km>avg*1.7 ? "KM ŞÜPHELİ" : "Normal";
+  let avg=(new Date().getFullYear()-year)*15000;
+  return km>avg*1.7 ? "KM ŞÜPHELİ" : "Normal";
 }
-
 async function analyze(){
-let plate=document.getElementById("plate").value;
-let {data:vehicle}=await db.from("vehicles").select("*").eq("plate",plate).single();
+  let plate=document.getElementById("plate").value;
+  let {data:vehicle}=await db.from("vehicles").select("*").eq("plate",plate).single();
+  if(!vehicle){ alert("Araç bulunamadı"); return; }
 
-if(!vehicle){
-alert("Araç bulunamadı");
-return;
+  let score=calculateScore(vehicle.year,vehicle.km);
+  let risk=kmRisk(vehicle.km,vehicle.year);
+
+  document.getElementById("result").innerHTML=
+  `<h3>${vehicle.brand} ${vehicle.model}</h3>
+  Güven Puanı: ${score}<br>
+  KM Durum: ${risk}<br>
+  Ekspertiz: ${vehicle.expertiz}<br>
+  <button onclick="downloadPDF('${vehicle.brand}','${vehicle.model}','${score}','${risk}')">PDF İndir</button>`;
+
+  await db.from("logs").insert({
+    user_id:currentUser.id,
+    email:currentUser.email,
+    action:"analiz:"+plate
+  });
 }
-
-let score=calculateScore(vehicle.year,vehicle.km);
-let risk=kmRisk(vehicle.km,vehicle.year);
-
-document.getElementById("result").innerHTML=
-`
-<h3>${vehicle.brand} ${vehicle.model}</h3>
-Güven Puanı: ${score}<br>
-KM Durum: ${risk}<br>
-Ekspertiz: ${vehicle.expertiz}<br>
-<button onclick="downloadPDF('${vehicle.brand}','${vehicle.model}','${score}','${risk}')">PDF İndir</button>
-`;
-
-await db.from("logs").insert({
-user_id:currentUser.id,
-email:currentUser.email,
-action:"analiz:"+plate
-});
-}
-
 function downloadPDF(brand,model,score,risk){
-const {jsPDF}=window.jspdf;
-let doc=new jsPDF();
-doc.text("Araç Analiz Raporu",20,20);
-doc.text("Araç: "+brand+" "+model,20,40);
-doc.text("Güven Puanı: "+score,20,60);
-doc.text("Risk: "+risk,20,80);
-doc.save("rapor.pdf");
+  const {jsPDF}=window.jspdf;
+  let doc=new jsPDF();
+  doc.text("Araç Analiz Raporu",20,20);
+  doc.text("Araç: "+brand+" "+model,20,40);
+  doc.text("Güven Puanı: "+score,20,60);
+  doc.text("Risk: "+risk,20,80);
+  doc.save("rapor.pdf");
 }
 
+// Admin araç ekleme + dosya yükleme + NSFW kontrol
 async function addVehicle(){
-let plate=document.getElementById("a_plate").value;
-let brand=document.getElementById("a_brand").value;
-let model=document.getElementById("a_model").value;
-let year=document.getElementById("a_year").value;
-let km=document.getElementById("a_km").value;
-let expertiz=document.getElementById("a_exp").value;
+  let plate=document.getElementById("a_plate").value;
+  let brand=document.getElementById("a_brand").value;
+  let model=document.getElementById("a_model").value;
+  let year=document.getElementById("a_year").value;
+  let km=document.getElementById("a_km").value;
+  let expFile=document.getElementById("a_exp_file").files[0];
 
-await db.from("vehicles").insert({
-plate,brand,model,year,km,expertiz
-});
+  let fileUrl="";
 
-alert("Araç eklendi");
+  if(expFile){
+    // Sightengine API ile +18 kontrol
+    const formData=new FormData();
+    formData.append("media",expFile);
+
+    const resp=await fetch(https://api.sightengine.com/1.0/check.json?models=nudity,wad,offensive&api_user=${SIGHTENGINE_USER}&api_secret=${SIGHTENGINE_SECRET},{
+      method:"POST",
+      body:formData
+    });
+    const result=await resp.json();
+
+    if(result.nudity?.safe < 0.9 || result.offensive?.prob > 0.5){
+      alert("Dosya uygunsuz, yüklenemez!");
+      return;
+    }
+
+    // Güvenli ise Storage'a yükle
+    const {data,error}=await db.storage.from("expertiz").upload("exp_"+Date.now()+"_"+expFile.name,expFile);
+    if(error){ alert("Dosya yüklenemedi"); return; }
+    fileUrl=data.path;
+  }
+
+  await db.from("vehicles").insert({
+    plate,brand,model,year,km,expertiz:fileUrl
+  });
+  alert("Araç eklendi");
 }
 
+// Admin kullanıcı yönetimi
 async function loadUsers(){
-let {data}=await db.from("profiles").select("id,email,is_admin");
-let html="";
-data.forEach(u=>{
-html+=`
-<div>
-${u.email} 
-<button onclick="makeAdmin('${u.id}')">Admin Yap</button>
-</div>
-`;
-});
-document.getElementById("users").innerHTML=html;
+  let {data}=await db.from("profiles").select("id,email,is_admin");
+  let html="";
+  data.forEach(u=>{
+    html+=<div>${u.email} <button onclick="makeAdmin('${u.id}')">Admin Yap</button></div>;
+  });
+  document.getElementById("users").innerHTML=html;
 }
-
 async function makeAdmin(id){
-await db.from("profiles").update({is_admin:true}).eq("id",id);
-alert("Admin verildi");
+  await db.from("profiles").update({is_admin:true}).eq("id",id);
+  alert("Admin verildi");
 }
 
 </script>
