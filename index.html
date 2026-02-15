@@ -124,23 +124,48 @@ years.forEach(y=>{
   yearEl.appendChild(opt);
 });
 
-// Kayıt / Giriş
+// -------------------- Kayıt --------------------
 async function register(){
   let email=document.getElementById("email").value;
   let password=document.getElementById("password").value;
-  await db.auth.signUp({email,password});
-  alert("Mailinizi onaylayın");
+
+  const { data, error } = await db.auth.signUp({ email, password });
+
+  if(error){
+    alert("Kayıt hatası: " + error.message);
+    return;
+  }
+
+  if(data.user){
+    alert("Kaydınız başarıyla gerçekleşti. Lütfen mailinizi onaylayın.");
+  }
 }
+
+// -------------------- Giriş --------------------
 async function login(){
   let email=document.getElementById("email").value;
   let password=document.getElementById("password").value;
-  let {data}=await db.auth.signInWithPassword({email,password});
-  currentUser=data.user;
+
+  const { data, error } = await db.auth.signInWithPassword({ email, password });
+
+  if(error){
+    alert("Giriş hatası: " + error.message);
+    return;
+  }
+
+  if(!data.user.email_confirmed_at){
+    alert("Email doğrulanmamış. Lütfen mailinizi onaylayın.");
+    return;
+  }
+
+  currentUser = data.user;
   initUser();
 }
+
+// -------------------- Çıkış --------------------
 async function logout(){await db.auth.signOut(); location.reload();}
 
-// Kullanıcı paneli başlat
+// -------------------- Kullanıcı paneli başlat --------------------
 async function initUser(){
   document.getElementById("authBox").classList.add("hidden");
   document.getElementById("userPanel").classList.remove("hidden");
@@ -157,7 +182,7 @@ async function initUser(){
   }
 }
 
-// Üyelik ve tek sorgu
+// -------------------- Üyelik ve tek sorgu --------------------
 async function buyMembership(){
   await db.from("profiles").update({
     membership_until:new Date(Date.now()+30*86400000)
@@ -169,7 +194,7 @@ async function buySingle(){
   alert("Tek sorgu aktif");
 }
 
-// Araç Analiz
+// -------------------- Araç Analiz --------------------
 function calculateScore(year,km){
   let score=100;
   let age=new Date().getFullYear()-year;
@@ -213,7 +238,7 @@ function downloadPDF(brand,model,score,risk){
   doc.save("rapor.pdf");
 }
 
-// Admin araç ekleme + dosya yükleme + NSFW kontrol
+// -------------------- Admin araç ekleme + dosya yükleme + NSFW kontrol --------------------
 async function addVehicle(){
   let plate=document.getElementById("a_plate").value;
   let brand=document.getElementById("a_brand").value;
@@ -225,7 +250,6 @@ async function addVehicle(){
   let fileUrl="";
 
   if(expFile){
-    // Sightengine API ile +18 kontrol
     const formData=new FormData();
     formData.append("media",expFile);
 
@@ -240,7 +264,6 @@ async function addVehicle(){
       return;
     }
 
-    // Güvenli ise Storage'a yükle
     const {data,error}=await db.storage.from("expertiz").upload("exp_"+Date.now()+"_"+expFile.name,expFile);
     if(error){ alert("Dosya yüklenemedi"); return; }
     fileUrl=data.path;
@@ -252,7 +275,7 @@ async function addVehicle(){
   alert("Araç eklendi");
 }
 
-// Admin kullanıcı yönetimi
+// -------------------- Admin kullanıcı yönetimi --------------------
 async function loadUsers(){
   let {data}=await db.from("profiles").select("id,email,is_admin");
   let html="";
