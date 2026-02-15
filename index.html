@@ -2,23 +2,37 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Araç Analiz Sistemi</title>
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
-body{font-family:Arial;background:#0d47a1;color:white;text-align:center;padding:20px}
-.box{background:white;color:black;padding:20px;border-radius:10px;max-width:520px;margin:auto;margin-top:20px}
-input,button{padding:10px;width:100%;margin-top:10px}
-button{background:#0d47a1;color:white;border:none;cursor:pointer}
+body{
+font-family:Arial;
+background:linear-gradient(135deg,#0a3cff,#0ad0ff);
+color:white;
+text-align:center;
+}
+.box{
+background:white;
+color:black;
+width:420px;
+margin:20px auto;
+padding:20px;
+border-radius:12px;
+}
+input,button{
+width:100%;
+padding:10px;
+margin:6px 0;
+}
+button{
+background:#0a3cff;
+color:white;
+border:none;
+cursor:pointer;
+}
 .hidden{display:none}
-.report{background:#f5f5f5;padding:15px;border-radius:8px;margin-top:15px;text-align:left}
-.score{font-size:26px;font-weight:bold}
-.riskLow{color:green}
-.riskMid{color:#ff9800}
-.riskHigh{color:red}
 </style>
 </head>
 
@@ -27,207 +41,182 @@ button{background:#0d47a1;color:white;border:none;cursor:pointer}
 <h1>Araç Analiz Sistemi</h1>
 
 <div class="box" id="authBox">
-<h3>Giriş</h3>
-<input type="email" id="email" placeholder="Email">
-<input type="password" id="password" placeholder="Şifre">
+<h3>Kayıt / Giriş</h3>
+<input id="email" placeholder="Email">
+<input id="password" type="password" placeholder="Şifre">
 <button onclick="register()">Kayıt Ol</button>
 <button onclick="login()">Giriş Yap</button>
 </div>
 
 <div class="box hidden" id="userPanel">
-
 <h3>Plaka Sorgu</h3>
-<input id="plaka" placeholder="Plaka">
+<input id="plate" placeholder="Plaka">
 
-<button onclick="tekSorgu()">Tek Sorgu Satın Al (30 TL)</button>
-<button onclick="uyelikAl()">Aylık Üyelik Al</button>
-
-<button onclick="plakaSorgu()">Analiz Oluştur</button>
+<button onclick="buySingle()">Tek Sorgu Satın Al (30 TL)</button>
+<button onclick="buyMembership()">Aylık Üyelik Al</button>
+<button onclick="analyze()">Analiz Oluştur</button>
 <button onclick="logout()">Çıkış Yap</button>
 
-<div id="rapor"></div>
+<div id="result"></div>
 </div>
 
 <div class="box hidden" id="adminPanel">
 <h3>Admin Panel</h3>
-
 <h4>Araç Ekle</h4>
-<input id="v_plaka" placeholder="Plaka">
-<input id="v_marka" placeholder="Marka">
-<input id="v_model" placeholder="Model">
-<input id="v_yil" placeholder="Yıl">
-<input id="v_km" placeholder="KM">
-<input id="v_ekspertiz" placeholder="Ekspertiz">
-<button onclick="aracEkle()">Kaydet</button>
+<input id="a_plate" placeholder="Plaka">
+<input id="a_brand" placeholder="Marka">
+<input id="a_model" placeholder="Model">
+<input id="a_year" placeholder="Yıl">
+<input id="a_km" placeholder="KM">
+<input id="a_exp" placeholder="Ekspertiz">
+<button onclick="addVehicle()">Kaydet</button>
 
+<h4>Kullanıcılar</h4>
+<div id="users"></div>
 </div>
 
 <script>
 
 const SUPABASE_URL="https://lxuqpziqyrrwtzcksgwz.supabase.co";
 const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4dXFwemlxeXJyd3R6Y2tzZ3d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA1NDM4MzMsImV4cCI6MjA4NjExOTgzM30.WOwK1D4eDNyPxYOe7HUuwndgPFQgmdmCcRxWsfyTSps";
+const db=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 
-const { createClient } = supabase;
-const db=createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+let currentUser=null;
 
 async function register(){
-const {error}=await db.auth.signUp({email:emailEl().value,password:passwordEl().value});
-if(error) alert(error.message);
-else alert("Kaydınız başarıyla gerçekleşti. Emailinizi onaylayın.");
+let email=document.getElementById("email").value;
+let password=document.getElementById("password").value;
+await db.auth.signUp({email,password});
+alert("Mail onayla");
 }
 
 async function login(){
-const {data,error}=await db.auth.signInWithPassword({email:emailEl().value,password:passwordEl().value});
-if(error) return alert(error.message);
-if(!data.user.email_confirmed_at) return alert("Email doğrulanmamış");
-authBox().classList.add("hidden");
-userPanel().classList.remove("hidden");
-checkAdmin();
+let email=document.getElementById("email").value;
+let password=document.getElementById("password").value;
+let {data}=await db.auth.signInWithPassword({email,password});
+currentUser=data.user;
+initUser();
 }
 
-async function logout(){await db.auth.signOut();location.reload();}
-
-async function checkAdmin(){
-const {data:{user}}=await db.auth.getUser();
-const {data}=await db.from("profiles").select("is_admin").eq("id",user.id).single();
-if(data?.is_admin) adminPanel().classList.remove("hidden");
+async function logout(){
+await db.auth.signOut();
+location.reload();
 }
 
-async function tekSorgu(){
-const {data:{user}}=await db.auth.getUser();
-await db.from("profiles").update({query_right:1}).eq("id",user.id);
-alert("1 sorgu hakkı verildi");
+async function initUser(){
+document.getElementById("authBox").classList.add("hidden");
+document.getElementById("userPanel").classList.remove("hidden");
+
+let {data:profile}=await db.from("profiles").select("*").eq("id",currentUser.id).single();
+
+if(profile.is_admin){
+document.getElementById("adminPanel").classList.remove("hidden");
+loadUsers();
 }
 
-async function uyelikAl(){
-const {data:{user}}=await db.auth.getUser();
-const bitis=new Date();
-bitis.setMonth(bitis.getMonth()+1);
-await db.from("profiles").update({membership_status:"aktif",membership_end:bitis}).eq("id",user.id);
+if(profile.membership_until && new Date(profile.membership_until)<new Date()){
+alert("Üyelik süren dolmuş");
+}
+}
+
+async function buyMembership(){
+await db.from("profiles").update({
+membership_until:new Date(Date.now()+30*86400000)
+}).eq("id",currentUser.id);
+
 alert("Üyelik aktif");
 }
 
-async function aracEkle(){
-await db.from("vehicles").insert({
-plaka:v_plaka.value.toUpperCase(),
-marka:v_marka.value,
-model:v_model.value,
-yil:v_yil.value,
-km:v_km.value,
-ekspertiz:v_ekspertiz.value
-});
-alert("Araç kaydedildi");
+async function buySingle(){
+await db.from("profiles").update({single_query:true}).eq("id",currentUser.id);
+alert("Tek sorgu aktif");
 }
 
-async function plakaSorgu(){
+function calculateScore(year,km){
+let score=100;
+let age=new Date().getFullYear()-year;
+score-=age*2;
+if(km>200000)score-=20;
+if(km>300000)score-=30;
+return Math.max(score,10);
+}
 
-const {data:{user}}=await db.auth.getUser();
-const {data:profile}=await db.from("profiles").select("*").eq("id",user.id).single();
+function kmRisk(km,year){
+let avg=(new Date().getFullYear()-year)*15000;
+return km>avg*1.7 ? "KM ŞÜPHELİ" : "Normal";
+}
 
-if(profile.membership_status==="aktif" && new Date(profile.membership_end)>new Date()){
-}else if(profile.query_right>0){
-await db.from("profiles").update({query_right:profile.query_right-1}).eq("id",user.id);
-}else{
-alert("Sorgu hakkınız yok");
+async function analyze(){
+let plate=document.getElementById("plate").value;
+let {data:vehicle}=await db.from("vehicles").select("*").eq("plate",plate).single();
+
+if(!vehicle){
+alert("Araç bulunamadı");
 return;
 }
 
-const plaka=plakaEl().value.toUpperCase();
-const {data}=await db.from("vehicles").select("*").eq("plaka",plaka).single();
-if(!data) return alert("Araç bulunamadı");
+let score=calculateScore(vehicle.year,vehicle.km);
+let risk=kmRisk(vehicle.km,vehicle.year);
 
-const analiz=aracAnalizMotoru(data);
+document.getElementById("result").innerHTML=
+`
+<h3>${vehicle.brand} ${vehicle.model}</h3>
+Güven Puanı: ${score}<br>
+KM Durum: ${risk}<br>
+Ekspertiz: ${vehicle.expertiz}<br>
+<button onclick="downloadPDF('${vehicle.brand}','${vehicle.model}','${score}','${risk}')">PDF İndir</button>
+`;
 
-rapor().innerHTML=`
-<div class="report">
-<h3>ARAÇ ANALİZ RAPORU</h3>
+await db.from("logs").insert({
+user_id:currentUser.id,
+email:currentUser.email,
+action:"analiz:"+plate
+});
+}
 
-Plaka: ${data.plaka}<br>
-Marka: ${data.marka}<br>
-Model: ${data.model}<br>
-Yıl: ${data.yil}<br>
-KM: ${data.km}<br>
+function downloadPDF(brand,model,score,risk){
+const {jsPDF}=window.jspdf;
+let doc=new jsPDF();
+doc.text("Araç Analiz Raporu",20,20);
+doc.text("Araç: "+brand+" "+model,20,40);
+doc.text("Güven Puanı: "+score,20,60);
+doc.text("Risk: "+risk,20,80);
+doc.save("rapor.pdf");
+}
 
-<hr>
+async function addVehicle(){
+let plate=document.getElementById("a_plate").value;
+let brand=document.getElementById("a_brand").value;
+let model=document.getElementById("a_model").value;
+let year=document.getElementById("a_year").value;
+let km=document.getElementById("a_km").value;
+let expertiz=document.getElementById("a_exp").value;
 
-Risk Skoru: ${analiz.risk}/100<br>
-Araç Güven Puanı:
-<span class="score ${analiz.renk}">${analiz.guven}</span>
+await db.from("vehicles").insert({
+plate,brand,model,year,km,expertiz
+});
 
-<hr>
+alert("Araç eklendi");
+}
 
-KM Analizi: ${analiz.km}<br>
-Yaş Etkisi: ${analiz.yas}<br>
-Ekspertiz Değerlendirme: ${analiz.ekspertiz}<br>
-
-<hr>
-
-<b>Sistem Yorumu:</b><br>
-${analiz.yorum}
-
-<br><br>
-<button onclick="pdfOlustur()">PDF İndir</button>
+async function loadUsers(){
+let {data}=await db.from("profiles").select("id,email,is_admin");
+let html="";
+data.forEach(u=>{
+html+=`
+<div>
+${u.email} 
+<button onclick="makeAdmin('${u.id}')">Admin Yap</button>
 </div>
 `;
+});
+document.getElementById("users").innerHTML=html;
 }
 
-function aracAnalizMotoru(data){
-
-let risk=0;
-let yorum=[];
-
-// yaş
-const yas=2025-data.yil;
-if(yas>10){risk+=25;yorum.push("Araç yaşı yüksek");}
-else yorum.push("Yaş normal");
-
-// km
-const ort=15000*yas;
-let kmDurum="Normal";
-if(data.km>ort*1.5){risk+=30;kmDurum="KM yüksek";}
-if(data.km<ort*0.5){risk+=25;kmDurum="KM düşürülmüş olabilir";}
-
-// ekspertiz
-let ekspertiz="Normal";
-if(data.ekspertiz?.toLowerCase().includes("ağır")){
-risk+=40;
-ekspertiz="Ağır hasar kaydı mevcut";
+async function makeAdmin(id){
+await db.from("profiles").update({is_admin:true}).eq("id",id);
+alert("Admin verildi");
 }
-
-// güven puanı
-let guven=Math.max(100-risk,0);
-
-let seviye="riskLow";
-if(guven<70) seviye="riskMid";
-if(guven<40) seviye="riskHigh";
-
-return{
-risk:risk,
-guven:guven,
-renk:seviye,
-km:kmDurum,
-yas: yas>10?"Yüksek risk":"Normal",
-ekspertiz:ekspertiz,
-yorum:yorum.join(", ")
-};
-}
-
-function pdfOlustur(){
-const { jsPDF } = window.jspdf;
-const doc=new jsPDF();
-doc.text("ARAÇ ANALİZ RAPORU",20,20);
-doc.text(rapor().innerText,20,40);
-doc.save("arac_analiz.pdf");
-}
-
-// helpers
-const emailEl=()=>document.getElementById("email");
-const passwordEl=()=>document.getElementById("password");
-const authBox=()=>document.getElementById("authBox");
-const userPanel=()=>document.getElementById("userPanel");
-const adminPanel=()=>document.getElementById("adminPanel");
-const plakaEl=()=>document.getElementById("plaka");
-const rapor=()=>document.getElementById("rapor");
 
 </script>
 </body>
