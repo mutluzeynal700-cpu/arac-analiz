@@ -18,7 +18,6 @@ button{background:#0a3cff;color:white;border:none;cursor:pointer;font-size:1em;}
 
 <h1>Araç Analiz & Expertiz Sistemi</h1>
 
-<!-- Kayıt / Giriş -->
 <div class="box" id="authBox">
 <h3>Kayıt / Giriş</h3>
 <input id="email" placeholder="Email" value="mslmcanlii@gmail.com">
@@ -27,24 +26,13 @@ button{background:#0a3cff;color:white;border:none;cursor:pointer;font-size:1em;}
 <button onclick="login()">Giriş Yap</button>
 </div>
 
-<!-- Kullanıcı Paneli -->
 <div class="box hidden" id="userPanel">
 <h3>Expertiz & Analiz</h3>
-
 <h4>Araç Seçin</h4>
-<select id="selectBrand" onchange="updateModels()">
-<option value="">Marka Seçin</option>
-</select>
-<select id="selectModel" onchange="updateYears()">
-<option value="">Model Seçin</option>
-</select>
-<select id="selectYear" onchange="updatePlates()">
-<option value="">Yıl Seçin</option>
-</select>
-<select id="selectPlate">
-<option value="">Plaka Seçin</option>
-</select>
-
+<select id="selectBrand" onchange="updateModels()"><option value="">Marka Seçin</option></select>
+<select id="selectModel" onchange="updateYears()"><option value="">Model Seçin</option></select>
+<select id="selectYear" onchange="updatePlates()"><option value="">Yıl Seçin</option></select>
+<select id="selectPlate"><option value="">Plaka Seçin</option></select>
 <button onclick="analyze()">Analiz Oluştur</button>
 
 <div id="expertizUpload" class="hidden">
@@ -57,7 +45,6 @@ button{background:#0a3cff;color:white;border:none;cursor:pointer;font-size:1em;}
 <button onclick="logout()">Çıkış Yap</button>
 </div>
 
-<!-- Admin Paneli -->
 <div class="box hidden" id="adminPanel">
 <h3>Admin Panel</h3>
 <h4>Kullanıcılar</h4>
@@ -67,27 +54,27 @@ button{background:#0a3cff;color:white;border:none;cursor:pointer;font-size:1em;}
 <script>
 const SUPABASE_URL = "https://lxuqpziqyrrwtzcksgwz.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4dXFwemlxeXJyd3R6Y2tzZ3d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA1NDM4MzMsImV4cCI6MjA4NjExOTgzM30.WOwK1D4eDNyPxYOe7HUuwndgPFQgmdmCcRxWsfyTSps";
-
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUser = null;
 const myAdminEmail = "mslmcanlii@gmail.com";
 let allVehicles = [];
 
 async function register(){
-    let email=document.getElementById("email").value;
-    let password=document.getElementById("password").value;
-    let {data,error} = await db.auth.signUp({email,password});
-    if(error){ alert("Kayıt başarısız: "+error.message); return; }
-    alert("Kaydınız başarıyla gerçekleşmiştir. Lütfen emailinizi onaylayın ve tekrar giriş yapın.");
+let email=document.getElementById("email").value;
+let password=document.getElementById("password").value;
+let {data,error}=await db.auth.signUp({email,password});
+if(error){ alert("Kayıt başarısız: "+error.message); return; }
+alert("Kaydınız başarıyla gerçekleşmiştir. Lütfen emailinizi onaylayın ve tekrar giriş yapın.");
 }
 
 async function login(){
-    let email=document.getElementById("email").value;
-    let password=document.getElementById("password").value;
-    let {data,error} = await db.auth.signInWithPassword({email,password});
-    if(error){ alert("Giriş başarısız: "+error.message); return; }
-    currentUser = data.user;
-    initUser();
+let email=document.getElementById("email").value;
+let password=document.getElementById("password").value;
+let {data,error}=await db.auth.signInWithPassword({email,password});
+if(error){ alert("Giriş başarısız: "+error.message); return; }
+currentUser=data.user;
+if(!currentUser.confirmed_at){ alert("Email onayı yapılmamış kullanıcı ile giriş yapamazsınız"); await logout(); return; }
+initUser();
 }
 
 async function logout(){ await db.auth.signOut(); location.reload(); }
@@ -95,7 +82,6 @@ async function logout(){ await db.auth.signOut(); location.reload(); }
 async function initUser(){
 document.getElementById("authBox").classList.add("hidden");
 document.getElementById("userPanel").classList.remove("hidden");
-
 if(currentUser.email===myAdminEmail){ document.getElementById("adminPanel").classList.remove("hidden"); loadUsers(); }
 
 let {data} = await db.from("vehicles").select("*");
