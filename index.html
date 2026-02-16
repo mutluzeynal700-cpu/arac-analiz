@@ -1,204 +1,190 @@
 <!DOCTYPE html>
-<test123></test123>
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Araç Analiz & Expertiz Sistemi</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<title>Araç Analiz PRO</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
 <style>
-body{font-family:Arial;background:linear-gradient(135deg,#0a3cff,#0ad0ff);color:white;text-align:center;margin:0;padding:0;}
-.box{background:white;color:black;width:90%;max-width:520px;margin:20px auto;padding:20px;border-radius:12px;box-sizing:border-box;}
-input,button,select,textarea{width:100%;padding:10px;margin:6px 0;box-sizing:border-box;}
-button{background:#0a3cff;color:white;border:none;cursor:pointer;font-size:1em;}
-.hidden{display:none;}
+body{
+font-family:Arial;
+background:linear-gradient(135deg,#0a3cff,#0ad0ff);
+color:white;
+text-align:center;
+margin:0;
+}
+
+.container{
+max-width:420px;
+margin:auto;
+padding:15px;
+}
+
+.box{
+background:white;
+color:black;
+padding:20px;
+border-radius:14px;
+margin-top:20px;
+box-shadow:0 10px 30px rgba(0,0,0,0.2);
+}
+
+input,button{
+width:100%;
+padding:12px;
+margin:6px 0;
+border-radius:8px;
+border:none;
+font-size:15px;
+}
+
+button{
+background:#0a3cff;
+color:white;
+cursor:pointer;
+font-weight:bold;
+}
+
+.hidden{display:none}
 </style>
 </head>
+
 <body>
 
-<h1>Araç Analiz & Expertiz Sistemi</h1>
+<div class="container">
+
+<h1>Araç Analiz PRO</h1>
 
 <div class="box" id="authBox">
 <h3>Kayıt / Giriş</h3>
-<input id="email" placeholder="Email" value="mslmcanlii@gmail.com">
-<input id="password" type="password" placeholder="Şifre">
+<input id="email" placeholder="Email" autocomplete="off">
+<input id="password" type="password" placeholder="Şifre" autocomplete="new-password">
 <button onclick="register()">Kayıt Ol</button>
 <button onclick="login()">Giriş Yap</button>
 </div>
 
 <div class="box hidden" id="userPanel">
-<h3>Expertiz & Analiz</h3>
-<h4>Araç Seçin</h4>
-<select id="selectBrand" onchange="updateModels()"><option value="">Marka Seçin</option></select>
-<select id="selectModel" onchange="updateYears()"><option value="">Model Seçin</option></select>
-<select id="selectYear" onchange="updatePlates()"><option value="">Yıl Seçin</option></select>
-<select id="selectPlate"><option value="">Plaka Seçin</option></select>
-<button onclick="analyze()">Analiz Oluştur</button>
-
-<div id="expertizUpload" class="hidden">
-<h4>Expertiz Yükle</h4>
-<input type="file" id="expertiz_file" accept="image/*">
-<button onclick="uploadExpertiz()">Yükle</button>
-</div>
-
+<h3>Plaka Sorgu</h3>
+<input id="plate" placeholder="Plaka">
+<button onclick="analyze()">Analiz Yap</button>
+<button onclick="logout()">Çıkış</button>
 <div id="result"></div>
-<button onclick="logout()">Çıkış Yap</button>
 </div>
 
 <div class="box hidden" id="adminPanel">
 <h3>Admin Panel</h3>
-<h4>Kullanıcılar</h4>
-<div id="users"></div>
+<input id="a_plate" placeholder="Plaka">
+<input id="a_brand" placeholder="Marka">
+<input id="a_model" placeholder="Model">
+<input id="a_year" placeholder="Yıl">
+<input id="a_km" placeholder="KM">
+<input id="a_exp" placeholder="Ekspertiz">
+<button onclick="addVehicle()">Araç Kaydet</button>
+</div>
+
 </div>
 
 <script>
-const SUPABASE_URL = "https://lxuqpziqyrrwtzcksgwz.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4dXFwemlxeXJyd3R6Y2tzZ3d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA1NDM4MzMsImV4cCI6MjA4NjExOTgzM30.WOwK1D4eDNyPxYOe7HUuwndgPFQgmdmCcRxWsfyTSps";
-const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-let currentUser = null;
-const myAdminEmail = "mslmcanlii@gmail.com";
-let allVehicles = [];
+const SUPABASE_URL="https://lxuqpziqyrrwtzcksgwz.supabase.co";
+const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4dXFwemlxeXJyd3R6Y2tzZ3d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA1NDM4MzMsImV4cCI6MjA4NjExOTgzM30.WOwK1D4eDNyPxYOe7HUuwndgPFQgmdmCcRxWsfyTSps";
+const db=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+
+let currentUser=null;
+
+window.onload=()=>{ document.getElementById("email").value=""; }
 
 async function register(){
-let email=document.getElementById("email").value;
-let password=document.getElementById("password").value;
-let {data,error}=await db.auth.signUp({email,password});
-if(error){ alert("Kayıt başarısız: "+error.message); return; }
-alert("Kaydınız başarıyla gerçekleşmiştir. Lütfen emailinizi onaylayın ve tekrar giriş yapın.");
+let email=emailVal();
+let password=passVal();
+
+let {error}=await db.auth.signUp({email,password});
+
+if(error){ alert(error.message); return; }
+
+alert("Kayıt başarılı. Mail onayı yapıp giriş yap.");
 }
 
 async function login(){
-let email=document.getElementById("email").value;
-let password=document.getElementById("password").value;
+let email=emailVal();
+let password=passVal();
+
 let {data,error}=await db.auth.signInWithPassword({email,password});
-if(error){ alert("Giriş başarısız: "+error.message); return; }
+
+if(error){ alert(error.message); return; }
+
 currentUser=data.user;
-if(!currentUser.confirmed_at){ alert("Email onayı yapılmamış kullanıcı ile giriş yapamazsınız"); await logout(); return; }
 initUser();
 }
 
-async function logout(){ await db.auth.signOut(); location.reload(); }
+async function logout(){
+await db.auth.signOut();
+location.reload();
+}
 
 async function initUser(){
-document.getElementById("authBox").classList.add("hidden");
-document.getElementById("userPanel").classList.remove("hidden");
-if(currentUser.email===myAdminEmail){ document.getElementById("adminPanel").classList.remove("hidden"); loadUsers(); }
+hide("authBox");
+show("userPanel");
 
-let {data} = await db.from("vehicles").select("*");
-allVehicles = data || [];
-populateBrands();
-}
+let {data:profile}=await db.from("profiles").select("*").eq("id",currentUser.id).single();
 
-function populateBrands(){
-let brands=[...new Set(allVehicles.map(v=>v.brand))];
-let brandSelect=document.getElementById("selectBrand");
-brandSelect.innerHTML=<option value="">Marka Seçin</option>;
-brands.forEach(b=>{brandSelect.innerHTML+=<option value="${b}">${b}</option>;});
-document.getElementById("selectModel").innerHTML=<option value="">Model Seçin</option>;
-document.getElementById("selectYear").innerHTML=<option value="">Yıl Seçin</option>;
-document.getElementById("selectPlate").innerHTML=<option value="">Plaka Seçin</option>;
-}
-
-function updateModels(){
-let brand=document.getElementById("selectBrand").value;
-let models=[...new Set(allVehicles.filter(v=>v.brand===brand).map(v=>v.model))];
-let modelSelect=document.getElementById("selectModel");
-modelSelect.innerHTML=<option value="">Model Seçin</option>;
-models.forEach(m=>{modelSelect.innerHTML+=<option value="${m}">${m}</option>;});
-document.getElementById("selectYear").innerHTML=<option value="">Yıl Seçin</option>;
-document.getElementById("selectPlate").innerHTML=<option value="">Plaka Seçin</option>;
-}
-
-function updateYears(){
-let brand=document.getElementById("selectBrand").value;
-let model=document.getElementById("selectModel").value;
-let years=[...new Set(allVehicles.filter(v=>v.brand===brand && v.model===model).map(v=>v.year))];
-let yearSelect=document.getElementById("selectYear");
-yearSelect.innerHTML=<option value="">Yıl Seçin</option>;
-years.forEach(y=>{yearSelect.innerHTML+=<option value="${y}">${y}</option>;});
-document.getElementById("selectPlate").innerHTML=<option value="">Plaka Seçin</option>;
-}
-
-function updatePlates(){
-let brand=document.getElementById("selectBrand").value;
-let model=document.getElementById("selectModel").value;
-let year=parseInt(document.getElementById("selectYear").value);
-let plates=allVehicles.filter(v=>v.brand===brand && v.model===model && v.year===year).map(v=>v.plate);
-let plateSelect=document.getElementById("selectPlate");
-plateSelect.innerHTML=<option value="">Plaka Seçin</option>;
-plates.forEach(p=>{plateSelect.innerHTML+=<option value="${p}">${p}</option>;});
-}
-
-function calculateScore(year,km){ let score=100; let age=new Date().getFullYear()-year; score-=age*2; if(km>200000)score-=20; if(km>300000)score-=30; return Math.max(score,10); }
-function kmRisk(km,year){ let avg=(new Date().getFullYear()-year)*15000; return km>avg*1.7 ? "KM ŞÜPHELİ":"Normal"; }
-
-function simpleAIComment(expertiz){
-expertiz = expertiz.toLowerCase();
-if(expertiz.includes("çizik")||expertiz.includes("hasar")) return "Araçta bazı yüzeysel hasarlar var.";
-if(expertiz.includes("motor")&&expertiz.includes("sorun")) return "Motor ile ilgili kontrol önerilir.";
-if(expertiz.includes("fren")) return "Fren sistemi kontrol edilmeli.";
-return "Araç genel olarak iyi durumda.";
+if(profile?.is_admin) show("adminPanel");
 }
 
 async function analyze(){
-let plate=document.getElementById("selectPlate").value;
-if(!plate){ alert("Plaka seçin"); return; }
-let vehicle = allVehicles.find(v=>v.plate===plate);
-if(!vehicle){ alert("Araç bulunamadı"); return; }
+let plate=document.getElementById("plate").value;
+let {data,error}=await db.from("vehicles").select("*").eq("plate",plate).single();
 
-let score=calculateScore(vehicle.year,vehicle.km);
-let risk=kmRisk(vehicle.km,vehicle.year);
-let aiComment=simpleAIComment(vehicle.expertiz);
+if(error||!data){ alert("Araç bulunamadı"); return; }
+
+let score=calcScore(data.year,data.km);
 
 document.getElementById("result").innerHTML=`
-<h3>${vehicle.brand} ${vehicle.model} (${vehicle.year})</h3>
+<h3>${data.brand} ${data.model}</h3>
 Güven Puanı: ${score}<br>
-KM Durum: ${risk}<br>
-Ekspertiz: ${vehicle.expertiz}<br>
-<b>AI Yorum:</b> ${aiComment}<br>
-<button onclick="downloadPDF('${vehicle.brand}','${vehicle.model}','${vehicle.year}','${score}','${risk}','${aiComment}')">PDF İndir</button>
+KM: ${data.km}<br>
+Ekspertiz: ${data.expertiz}<br>
+<button onclick="pdf('${data.brand}','${data.model}','${score}')">PDF İndir</button>
 `;
-document.getElementById("expertizUpload").classList.remove("hidden");
-
-await db.from("logs").insert({user_id:currentUser.id,email:currentUser.email,action:"analiz:"+plate});
 }
 
-function downloadPDF(brand,model,year,score,risk,aiComment){
+async function addVehicle(){
+await db.from("vehicles").insert({
+plate:v("a_plate"),
+brand:v("a_brand"),
+model:v("a_model"),
+year:v("a_year"),
+km:v("a_km"),
+expertiz:v("a_exp")
+});
+alert("Araç eklendi");
+}
+
+function calcScore(year,km){
+let score=100;
+let age=new Date().getFullYear()-year;
+score-=age*2;
+if(km>200000)score-=20;
+return Math.max(score,10);
+}
+
+function pdf(brand,model,score){
 const {jsPDF}=window.jspdf;
 let doc=new jsPDF();
-doc.text("Araç Analiz Raporu",20,20);
-doc.text("Araç: "+brand+" "+model+" ("+year+")",20,40);
-doc.text("Güven Puanı: "+score,20,60);
-doc.text("Risk: "+risk,20,80);
-doc.text("AI Yorum: "+aiComment,20,100);
+doc.text("Araç Analiz PRO",20,20);
+doc.text(brand+" "+model,20,40);
+doc.text("Güven: "+score,20,60);
 doc.save("rapor.pdf");
 }
 
-async function uploadExpertiz(){
-const file=document.getElementById("expertiz_file").files[0];
-const plate=document.getElementById("selectPlate").value;
-if(!file || !plate){ alert("Plaka ve dosya gerekli"); return; }
-const forbidden=["sex","xxx","fuck","arslan"];
-for(let word of forbidden){ if(file.name.toLowerCase().includes(word)){ alert("Dosya uygun değil"); return; } }
-const {data,error} = await db.storage.from("expertiz").upload(${plate}_${file.name},file,{upsert:true});
-if(error){ alert("Yükleme hatası"); console.log(error); return; }
-alert("Expertiz yüklendi");
-}
-
-async function loadUsers(){
-let {data}=await db.from("profiles").select("id,email,is_admin");
-let html="";
-data.forEach(u=>{ html+=<div>${u.email} <button onclick="makeAdmin('${u.id}')">Admin Yap</button></div>; });
-document.getElementById("users").innerHTML=html;
-}
-
-async function makeAdmin(id){
-await db.from("profiles").update({is_admin:true}).eq("id",id);
-alert("Admin verildi");
-}
-
+function v(id){return document.getElementById(id).value}
+function emailVal(){return v("email")}
+function passVal(){return v("password")}
+function show(id){document.getElementById(id).classList.remove("hidden")}
+function hide(id){document.getElementById(id).classList.add("hidden")}
 </script>
+
 </body>
 </html>
-
