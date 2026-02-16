@@ -3,32 +3,141 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TEST LOGIN</title>
+<title>Araç Analiz Pro</title>
+
+<link rel="icon" href="data:,">
 
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <style>
-body{font-family:Arial;text-align:center;margin-top:80px}
-input,button{padding:10px;margin:5px;width:250px}
+body{
+font-family:Arial;
+margin:0;
+background:linear-gradient(135deg,#0a3cff,#0ad0ff);
+color:white;
+text-align:center;
+}
+.box{
+background:white;
+color:black;
+width:95%;
+max-width:420px;
+margin:20px auto;
+padding:20px;
+border-radius:12px;
+}
+input,select,button{
+width:100%;
+padding:12px;
+margin:6px 0;
+font-size:16px;
+}
+button{
+background:#0a3cff;
+color:white;
+border:none;
+cursor:pointer;
+border-radius:6px;
+}
+.hidden{display:none}
+img{max-width:100%;border-radius:8px;margin-top:10px}
 </style>
 </head>
 
 <body>
 
-<h2>Supabase Test</h2>
+<h1>Araç Analiz Pro</h1>
 
-<input id="email" placeholder="email">
-<input id="password" type="password" placeholder="şifre">
-<br>
+<div class="box" id="authBox">
+<h3>Kayıt / Giriş</h3>
+<input id="email" placeholder="Email">
+<input id="password" type="password" placeholder="Şifre">
 <button onclick="register()">Kayıt Ol</button>
 <button onclick="login()">Giriş Yap</button>
+</div>
+
+<div class="box hidden" id="userPanel">
+<h3>Plaka Sorgu</h3>
+<input id="plate" placeholder="Plaka">
+
+<h4>Ekspertiz Yükle</h4>
+<select id="brand"></select>
+<select id="model"></select>
+<select id="year"></select>
+<input type="file" id="file">
+
+<button onclick="uploadExpertiz()">Ekspertiz Gönder</button>
+<button onclick="analyze()">Analiz Oluştur</button>
+<button onclick="logout()">Çıkış</button>
+
+<div id="result"></div>
+</div>
+
+<div class="box hidden" id="adminPanel">
+<h3>Admin Panel</h3>
+<input id="a_plate" placeholder="Plaka">
+<select id="a_brand"></select>
+<select id="a_model"></select>
+<select id="a_year"></select>
+<input id="a_km" placeholder="KM">
+<button onclick="addVehicle()">Araç Kaydet</button>
+</div>
 
 <script>
 
 const SUPABASE_URL="https://lxuqpziqyrrwtzcksgwz.supabase.co";
 const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4dXFwemlxeXJyd3R6Y2tzZ3d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA1NDM4MzMsImV4cCI6MjA4NjExOTgzM30.WOwK1D4eDNyPxYOe7HUuwndgPFQgmdmCcRxWsfyTSps";
+const ADMIN_EMAIL="mslmcanlii@gmail.com";
 
 const db = supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+
+let currentUser=null;
+
+const vehicleData={
+"BMW":["3 Serisi","5 Serisi","X5"],
+"Mercedes":["C200","E200","S500"],
+"Toyota":["Corolla","Camry","Yaris"],
+"Volkswagen":["Passat","Golf","Polo"]
+};
+
+function fillBrands(){
+let brand=document.getElementById("brand");
+let a_brand=document.getElementById("a_brand");
+brand.innerHTML="";
+a_brand.innerHTML="";
+for(let b in vehicleData){
+brand.innerHTML+=<option>${b}</option>;
+a_brand.innerHTML+=<option>${b}</option>;
+}
+fillModels();
+}
+
+function fillModels(){
+let b=document.getElementById("brand").value;
+let a_b=document.getElementById("a_brand").value;
+
+let model=document.getElementById("model");
+let a_model=document.getElementById("a_model");
+
+model.innerHTML="";
+a_model.innerHTML="";
+
+vehicleData[b].forEach(m=>model.innerHTML+=<option>${m}</option>);
+vehicleData[a_b].forEach(m=>a_model.innerHTML+=<option>${m}</option>);
+
+fillYears();
+}
+
+function fillYears(){
+let year=document.getElementById("year");
+let a_year=document.getElementById("a_year");
+year.innerHTML="";
+a_year.innerHTML="";
+for(let y=2025;y>=1990;y--){
+year.innerHTML+=<option>${y}</option>;
+a_year.innerHTML+=<option>${y}</option>;
+}
+}
 
 async function register(){
 const email=document.getElementById("email").value;
@@ -37,7 +146,7 @@ const password=document.getElementById("password").value;
 const {error}=await db.auth.signUp({email,password});
 
 if(error) alert(error.message);
-else alert("Kayıt başarılı");
+else alert("Kayıt başarılı. Email onayla.");
 }
 
 async function login(){
@@ -46,9 +155,79 @@ const password=document.getElementById("password").value;
 
 const {data,error}=await db.auth.signInWithPassword({email,password});
 
-if(error) alert(error.message);
-else alert("Giriş başarılı: "+data.user.email);
+if(error){alert(error.message);return;}
+
+currentUser=data.user;
+
+document.getElementById("authBox").classList.add("hidden");
+document.getElementById("userPanel").classList.remove("hidden");
+
+if(currentUser.email===ADMIN_EMAIL){
+document.getElementById("adminPanel").classList.remove("hidden");
 }
+
+fillBrands();
+}
+
+async function logout(){
+await db.auth.signOut();
+location.reload();
+}
+
+async function uploadExpertiz(){
+let file=document.getElementById("file").files[0];
+if(!file){alert("Dosya seç");return;}
+
+let path=currentUser.id+"/"+Date.now()+".jpg";
+
+await db.storage.from("expertiz").upload(path,file);
+
+await db.from("expertiz").insert({
+user_id:currentUser.id,
+plate:document.getElementById("plate").value,
+brand:document.getElementById("brand").value,
+model:document.getElementById("model").value,
+year:document.getElementById("year").value,
+image:path
+});
+
+alert("Ekspertiz yüklendi");
+}
+
+async function analyze(){
+let plate=document.getElementById("plate").value;
+
+let {data}=await db.from("expertiz").select("*").eq("plate",plate);
+
+if(!data || data.length===0){
+alert("Kayıt yok");
+return;
+}
+
+let e=data[0];
+
+let {data:url}=db.storage.from("expertiz").getPublicUrl(e.image);
+
+document.getElementById("result").innerHTML=`
+<h3>${e.brand} ${e.model}</h3>
+Yıl: ${e.year}<br>
+<img src="${url.publicUrl}">
+`;
+}
+
+async function addVehicle(){
+await db.from("vehicles").insert({
+plate:document.getElementById("a_plate").value,
+brand:document.getElementById("a_brand").value,
+model:document.getElementById("a_model").value,
+year:document.getElementById("a_year").value,
+km:document.getElementById("a_km").value
+});
+alert("Araç eklendi");
+}
+
+document.getElementById("brand").onchange=fillModels;
+document.getElementById("a_brand").onchange=fillModels;
 
 </script>
 
