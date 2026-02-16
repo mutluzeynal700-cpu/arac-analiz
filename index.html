@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Araç Analiz & Expertiz Sistemi (Ücretsiz AI)</title>
+<title>Araç Analiz & Expertiz Sistemi (Pro + Ücretsiz AI)</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -46,8 +46,9 @@ button{
 
 <body>
 
-<h1>Araç Analiz & Expertiz Sistemi (Ücretsiz AI)</h1>
+<h1>Araç Analiz & Expertiz Sistemi (Pro + Ücretsiz AI)</h1>
 
+<!-- Kayıt / Giriş -->
 <div class="box" id="authBox">
 <h3>Kayıt / Giriş</h3>
 <input id="email" placeholder="Email">
@@ -56,6 +57,7 @@ button{
 <button onclick="login()">Giriş Yap</button>
 </div>
 
+<!-- Kullanıcı Paneli -->
 <div class="box hidden" id="userPanel">
 <h3>Expertiz & Analiz</h3>
 
@@ -85,6 +87,7 @@ button{
 <button onclick="logout()">Çıkış Yap</button>
 </div>
 
+<!-- Admin Paneli -->
 <div class="box hidden" id="adminPanel">
 <h3>Admin Panel</h3>
 <h4>Kullanıcılar</h4>
@@ -99,31 +102,63 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser = null;
 const myAdminEmail = "mslmcanlii@gmail.com";
-
 let allVehicles = [];
 
-// ===== Auth =========
+// ===== Kayıt =========
 async function register(){
-    let email=document.getElementById("email").value;
-    let password=document.getElementById("password").value;
-    await db.auth.signUp({email,password});
-    alert("Mail onayla");
+    let email = document.getElementById("email").value;
+    let password = document.getElementById("password").value;
+
+    if(!email || !password){
+        alert("Email ve şifre gerekli");
+        return;
+    }
+
+    try{
+        const {data, error} = await db.auth.signUp({email, password});
+        if(error){
+            alert("Kayıt başarısız: " + error.message);
+            return;
+        }
+        alert("Kaydınız başarıyla gerçekleşmiştir. Lütfen size gönderilen emaili onaylayıp tekrar giriş yapınız.");
+    } catch(e){
+        console.log(e);
+        alert("Beklenmedik hata: " + e.message);
+    }
 }
 
+// ===== Giriş =========
 async function login(){
-    let email=document.getElementById("email").value;
-    let password=document.getElementById("password").value;
-    let {data} = await db.auth.signInWithPassword({email,password});
-    currentUser = data.user;
-    await initUser();
+    let email = document.getElementById("email").value;
+    let password = document.getElementById("password").value;
+
+    if(!email || !password){
+        alert("Email ve şifre gerekli");
+        return;
+    }
+
+    try{
+        const {data, error} = await db.auth.signInWithPassword({email, password});
+        if(error){
+            alert("Giriş başarısız: " + error.message);
+            return;
+        }
+
+        // Email doğrulama kontrolü
+        if(!data.user.confirmed_at){
+            alert("Lütfen emailinizi onaylayın ve tekrar giriş yapın.");
+            return;
+        }
+
+        currentUser = data.user;
+        await initUser(); // Paneli başlat
+    } catch(e){
+        console.log(e);
+        alert("Beklenmedik hata: " + e.message);
+    }
 }
 
-async function logout(){
-    await db.auth.signOut();
-    location.reload();
-}
-
-// ===== Kullanıcı/Admin Kontrol =====
+// ===== Kullanıcı/Admin Kontrol =========
 async function initUser(){
     document.getElementById("authBox").classList.add("hidden");
     document.getElementById("userPanel").classList.remove("hidden");
@@ -140,7 +175,7 @@ async function initUser(){
     populateBrands();
 }
 
-// ===== Dropdown =========
+// ===== Dropdown Fonksiyonları =========
 function populateBrands(){
     let brands = [...new Set(allVehicles.map(v=>v.brand))];
     let brandSelect = document.getElementById("selectBrand");
@@ -196,7 +231,7 @@ function kmRisk(km,year){
     return km>avg*1.7 ? "KM ŞÜPHELİ" : "Normal";
 }
 
-// Basit JS tabanlı yorumlama (AI yerine)
+// Basit JS AI yorumlama
 function simpleAIComment(expertiz){
     expertiz = expertiz.toLowerCase();
     if(expertiz.includes("çizik") || expertiz.includes("hasar")) return "Araçta bazı yüzeysel hasarlar var.";
@@ -267,6 +302,12 @@ async function loadUsers(){
 async function makeAdmin(id){
     await db.from("profiles").update({is_admin:true}).eq("id",id);
     alert("Admin verildi");
+}
+
+// ===== Logout =========
+async function logout(){
+    await db.auth.signOut();
+    location.reload();
 }
 </script>
 </body>
