@@ -3,11 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Araç Analiz & Expertiz Sistemi (Pro)</title>
-
+<title>Araç Analiz & Expertiz Sistemi</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
 <style>
 body{font-family:Arial;background:linear-gradient(135deg,#0a3cff,#0ad0ff);color:white;text-align:center;margin:0;padding:0;}
 .box{background:white;color:black;width:90%;max-width:520px;margin:20px auto;padding:20px;border-radius:12px;box-sizing:border-box;}
@@ -18,7 +16,7 @@ button{background:#0a3cff;color:white;border:none;cursor:pointer;font-size:1em;}
 </head>
 <body>
 
-<h1>Araç Analiz & Expertiz Sistemi (Pro)</h1>
+<h1>Araç Analiz & Expertiz Sistemi</h1>
 
 <!-- Kayıt / Giriş -->
 <div class="box" id="authBox">
@@ -78,22 +76,18 @@ let allVehicles = [];
 async function register(){
     let email=document.getElementById("email").value;
     let password=document.getElementById("password").value;
-    try{
-        let {data,error} = await db.auth.signUp({email,password});
-        if(error){ alert("Kayıt başarısız: "+error.message); return; }
-        alert("Kaydınız başarıyla gerçekleşmiştir. Lütfen emailinizi onaylayın ve tekrar giriş yapın.");
-    } catch(e){ console.log(e); alert("Beklenmedik hata: "+e.message); }
+    let {data,error} = await db.auth.signUp({email,password});
+    if(error){ alert("Kayıt başarısız: "+error.message); return; }
+    alert("Kaydınız başarıyla gerçekleşmiştir. Lütfen emailinizi onaylayın ve tekrar giriş yapın.");
 }
 
 async function login(){
     let email=document.getElementById("email").value;
     let password=document.getElementById("password").value;
-    try{
-        let {data,error} = await db.auth.signInWithPassword({email,password});
-        if(error){ alert("Giriş başarısız: "+error.message); return; }
-        currentUser = data.user;
-        initUser();
-    } catch(e){ console.log(e); alert("Beklenmedik hata: "+e.message); }
+    let {data,error} = await db.auth.signInWithPassword({email,password});
+    if(error){ alert("Giriş başarısız: "+error.message); return; }
+    currentUser = data.user;
+    initUser();
 }
 
 async function logout(){ await db.auth.signOut(); location.reload(); }
